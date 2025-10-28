@@ -2,6 +2,8 @@
 
 An open-source, AI-powered test automation platform built with React, Next.js, and Firebase. T4U provides an intelligent testing environment with real-time browser preview, automated test execution, and comprehensive test case management.
 
+![Demo](./public/demo.gif)
+
 ## 🚀 Features
 
 - **AI-Powered Testing**: Automated test execution with intelligent browser automation
