@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Variables for theming - Light theme */
+:root {
+  /* Background colors */
+  --background-white-main: #f8f8f7;
+  --background-gray-main: #f8f8f7;
+  --background-nav: #ececec;
+  --background-menu-white: #ffffff;
+  --background-card-gray: #ffffff;
+
+  /* Fill colors */
+  --fill-input-chat: #ffffff;
+  --fill-tsp-gray-main: rgba(0, 0, 0, 0.04);
+  --fill-tsp-white-main: rgba(0, 0, 0, 0.04);
+  --fill-tsp-white-light: rgba(0, 0, 0, 0.02);
+  --fill-tsp-white-dark: rgba(0, 0, 0, 0.06);
+  --fill-white: #ffffff;
+
+  /* Text colors */
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-tertiary: #858481;
+  --text-disable: #b9b9b7;
+  --text-onblack: #ffffff;
+
+  /* Icon colors */
+  --icon-primary: #1a1a1a;
+  --icon-secondary: #858481;
+  --icon-tertiary: #b9b9b7;
+
+  /* Border colors */
+  --border-main: rgba(0, 0, 0, 0.08);
+  --border-light: rgba(0, 0, 0, 0.06);
+  --border-dark: rgba(0, 0, 0, 0.12);
+  --border-btn-main: rgba(0, 0, 0, 0.08);
+  --border-input-active: #1a1a1a;
+  --border-white: rgba(255, 255, 255, 0.2);
+
+  /* Button colors */
+  --Button-primary-white: #ffffff;
+  --Button-primary-black: #1a1a1a;
+
+  /* Tab colors */
+  --tab-active-black: #1a1a1a;
+
+  /* Shadow colors */
+  --shadow-S: rgba(0, 0, 0, 0.08);
+  --shadow-XS: rgba(0, 0, 0, 0.04);
+
+  /* Gradual colors */
+  --gradual-gray-0: rgba(248, 248, 247, 0);
+
+  /* Function colors */
+  --function-error: #ef4444;
+  --function-error-tsp: rgba(239, 68, 68, 0.1);
+  --function-warning: #f59e0b;
+  --function-warning-tsp: rgba(245, 158, 11, 0.1);
+
+  /* Logo color */
+  --logo-color: #1a1a1a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--background-gray-main);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-disable);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.font-serif {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+.font-georgia {
+  font-family: Georgia, "Times New Roman", Times, serif;
+}
+
+/* Toast animations */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
