@@ -98,6 +98,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const [editingRun, setEditingRun] = useState<Run | null>(null);
   const [showCreateFeatureModal, setShowCreateFeatureModal] = useState(false);
   const [autoExpandFeatureId, setAutoExpandFeatureId] = useState<string | null>(null);
+  const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set());
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [moveItem, setMoveItem] = useState<{
     id: string;
@@ -139,6 +140,25 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       setSelectedTestCaseId(testCaseIdParam);
     }
   }, []); // Only run on mount
+
+  useEffect(() => {
+    if (selectedTestCaseId) {
+      const selectedTestCase = testCases.find(tc => tc.id === selectedTestCaseId);
+      if (selectedTestCase) {
+        // Find the story containing this test case
+        const story = stories.find(s => s.id === selectedTestCase.story_id);
+        if (story) {
+          // Find the feature containing this story
+          const feature = features.find(f => f.id === story.feature_id);
+          if (feature) {
+            setAutoExpandFeatureId(feature.id);
+          }
+          // Expand the story
+          setExpandedStories(prev => new Set([...prev, story.id]));
+        }
+      }
+    }
+  }, [selectedTestCaseId, features, stories, testCases]);
 
   const loadTestPlans = async () => {
     if (!tenant) return;
@@ -1063,6 +1083,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
             statuses={statuses}
             selectedTestCaseId={selectedTestCaseId || undefined}
             autoExpandFeatureId={autoExpandFeatureId}
+            autoExpandStoryId={selectedTestCaseId ? stories.find(s => s.id === testCases.find(tc => tc.id === selectedTestCaseId)?.story_id)?.id || null : null}
             onTestCaseSelect={handleSelectTestCase}
             onCreateFeature={() => setShowCreateFeatureModal(true)}
             onCreateStory={handleCreateStoryInline}

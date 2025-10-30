@@ -12,6 +12,7 @@ interface TestCaseTreeProps {
   statuses: TestCaseStatus[];
   selectedTestCaseId?: string;
   autoExpandFeatureId?: string | null; // Feature to auto-expand
+  autoExpandStoryId?: string | null; // Story to auto-expand
   onTestCaseSelect: (testCaseId: string) => void;
   onCreateFeature?: () => void;
   onCreateStory?: (featureId: string, name: string) => Promise<string | void>;
@@ -37,6 +38,7 @@ export default function TestCaseTree({
   statuses,
   selectedTestCaseId,
   autoExpandFeatureId,
+  autoExpandStoryId,
   onTestCaseSelect,
   onCreateFeature,
   onCreateStory,
@@ -67,6 +69,13 @@ export default function TestCaseTree({
       setExpandedFeatures(new Set(expandedFeatures).add(autoExpandFeatureId));
     }
   }, [autoExpandFeatureId]);
+
+  // Auto-expand story when requested from parent
+  useEffect(() => {
+    if (autoExpandStoryId && !expandedStories.has(autoExpandStoryId)) {
+      setExpandedStories(new Set(expandedStories).add(autoExpandStoryId));
+    }
+  }, [autoExpandStoryId]);
 
   const toggleFeature = (featureId: string) => {
     const newExpanded = new Set(expandedFeatures);
