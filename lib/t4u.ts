@@ -1751,3 +1751,95 @@ export async function deleteTestCaseComment(commentId: string): Promise<void> {
   }
 }
 
+// ============================================
+// Helper Functions for Dynamic Routing
+// ============================================
+
+/**
+ * Get a single test case by ID
+ */
+export async function getTestCaseById(testCaseId: string): Promise<TestCase | null> {
+  try {
+    const testCaseRef = doc(db, "test_cases", testCaseId);
+    const testCaseDoc = await getDoc(testCaseRef);
+
+    if (!testCaseDoc.exists()) {
+      return null;
+    }
+
+    return {
+      id: testCaseDoc.id,
+      ...testCaseDoc.data(),
+    } as TestCase;
+  } catch (error) {
+    console.error("[T4U] Error fetching test case:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get a single project by ID
+ */
+export async function getProjectById(projectId: string): Promise<Project | null> {
+  try {
+    const projectRef = doc(db, "projects", projectId);
+    const projectDoc = await getDoc(projectRef);
+
+    if (!projectDoc.exists()) {
+      return null;
+    }
+
+    return {
+      id: projectDoc.id,
+      ...projectDoc.data(),
+    } as Project;
+  } catch (error) {
+    console.error("[T4U] Error fetching project:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get a single feature by ID
+ */
+export async function getFeatureById(featureId: string): Promise<Feature | null> {
+  try {
+    const featureRef = doc(db, "features", featureId);
+    const featureDoc = await getDoc(featureRef);
+
+    if (!featureDoc.exists()) {
+      return null;
+    }
+
+    return {
+      id: featureDoc.id,
+      ...featureDoc.data(),
+    } as Feature;
+  } catch (error) {
+    console.error("[T4U] Error fetching feature:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get a single story by ID
+ */
+export async function getStoryById(storyId: string): Promise<Story | null> {
+  try {
+    const storyRef = doc(db, "stories", storyId);
+    const storyDoc = await getDoc(storyRef);
+
+    if (!storyDoc.exists()) {
+      return null;
+    }
+
+    return {
+      id: storyDoc.id,
+      ...storyDoc.data(),
+    } as Story;
+  } catch (error) {
+    console.error("[T4U] Error fetching story:", error);
+    throw error;
+  }
+}
+

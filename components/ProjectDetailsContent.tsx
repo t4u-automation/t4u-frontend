@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -70,7 +70,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const { user, loading: authLoading } = useAuth();
   const { tenant, loading: tenantLoading, needsOnboarding } = useTenant(user);
   const router = useRouter();
-  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const searchParams = useSearchParams();
 
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -82,6 +82,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const tabParam = searchParams.get('tab') as "test-cases" | "test-plans" | "runs" | "settings" | null;
+  const testCaseIdParam = searchParams.get('testCaseId') as string | null;
   const [activeMenuItem, setActiveMenuItem] = useState<"test-cases" | "test-plans" | "runs" | "settings">(
     tabParam && ["test-cases", "test-plans", "runs", "settings"].includes(tabParam) ? tabParam : "test-cases"
   );
@@ -131,6 +132,13 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       loadRuns();
     }
   }, [tenant, projectId]);
+
+  // Only restore from URL on initial page load (when selectedTestCaseId is null but testCaseIdParam exists)
+  useEffect(() => {
+    if (testCaseIdParam && !selectedTestCaseId) {
+      setSelectedTestCaseId(testCaseIdParam);
+    }
+  }, []); // Only run on mount
 
   const loadTestPlans = async () => {
     if (!tenant) return;
@@ -503,6 +511,22 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       showError("Failed to delete test case");
       throw error;
     }
+  };
+
+  const handleSelectTestCase = (testCaseId: string) => {
+    setSelectedTestCaseId(testCaseId);
+    // Update URL with test case ID query param, but stay on the same page
+    router.push(`?testCaseId=${testCaseId}`);
+  };
+
+  const handleTabChange = (tab: "overview" | "automated-steps" | "ai-exploration") => {
+    // Update URL with tab query param while keeping testCaseId
+    const params = new URLSearchParams();
+    if (selectedTestCaseId) {
+      params.set('testCaseId', selectedTestCaseId);
+    }
+    params.set('tab', tab);
+    router.push(`?${params.toString()}`);
   };
 
   const handleMoveItem = async (targetProjectId: string) => {
@@ -1039,7 +1063,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
             statuses={statuses}
             selectedTestCaseId={selectedTestCaseId || undefined}
             autoExpandFeatureId={autoExpandFeatureId}
-            onTestCaseSelect={setSelectedTestCaseId}
+            onTestCaseSelect={handleSelectTestCase}
             onCreateFeature={() => setShowCreateFeatureModal(true)}
             onCreateStory={handleCreateStoryInline}
             onCreateTestCase={handleCreateTestCaseInline}
@@ -1055,9 +1079,9 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
             onRenameFeature={handleOpenRenameFeature}
             onRenameStory={handleOpenRenameStory}
             onRenameTestCase={handleOpenRenameTestCase}
-          />
+            />
 
-          {/* Create Feature Modal */}
+            {/* Create Feature Modal */}
           <CreateFeatureModal
             isOpen={showCreateFeatureModal}
             onClose={() => setShowCreateFeatureModal(false)}
@@ -1108,6 +1132,8 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
               onStatusChange={handleChangeTestCaseStatus}
               onUpdate={handleUpdateTestCase}
               onDelete={handleDeleteTestCase}
+              activeTab={(searchParams.get('tab') as any) || "overview"}
+              onTabChange={handleTabChange}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center bg-white">

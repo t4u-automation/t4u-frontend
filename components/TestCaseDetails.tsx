@@ -24,6 +24,8 @@ interface TestCaseDetailsProps {
   onStatusChange: (testCaseId: string, newStatusId: string) => Promise<void>;
   onUpdate: (updates: Partial<Pick<TestCase, "description" | "scenario">>) => Promise<void>;
   onDelete?: (testCaseId: string) => Promise<void>;
+  activeTab?: "overview" | "automated-steps" | "ai-exploration";
+  onTabChange?: (tab: "overview" | "automated-steps" | "ai-exploration") => void;
 }
 
 export default function TestCaseDetails({ 
@@ -32,14 +34,19 @@ export default function TestCaseDetails({
   allStatuses,
   onStatusChange,
   onUpdate,
-  onDelete
+  onDelete,
+  activeTab: initialTab,
+  onTabChange,
 }: TestCaseDetailsProps) {
   const { user } = useAuth();
   const { tenant } = useTenant(user);
   const { showSuccess, showError } = useToast();
-  const [activeTab, setActiveTab] = useState<
+  // Use local state if onTabChange not provided (standalone mode), otherwise use prop
+  const [localActiveTab, setLocalActiveTab] = useState<
     "overview" | "automated-steps" | "ai-exploration"
-  >("overview");
+  >(initialTab || "overview");
+  const currentTab = localActiveTab;
+  
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isEditingScenario, setIsEditingScenario] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState(testCase.description || "");
@@ -80,7 +87,6 @@ export default function TestCaseDetails({
 
   // Reset to Overview tab and cancel any editing when test case changes
   useEffect(() => {
-    setActiveTab("overview");
     setIsEditingDescription(false);
     setIsEditingScenario(false);
     setDescriptionValue(testCase.description || "");
@@ -89,6 +95,13 @@ export default function TestCaseDetails({
     setProvenSteps(testCase.proven_steps);
     setProvenStepsCount(testCase.proven_steps_count);
   }, [testCase.id, testCase.description, testCase.scenario]);
+
+  // Sync initialTab prop to localActiveTab when it changes (from URL)
+  useEffect(() => {
+    if (initialTab) {
+      setLocalActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Real-time listener for proven_steps updates
   useEffect(() => {
@@ -499,9 +512,17 @@ export default function TestCaseDetails({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "overview" | "automated-steps" | "ai-exploration")}
+              onClick={() => {
+                const newTab = tab.id as "overview" | "automated-steps" | "ai-exploration";
+                // Always update local state for immediate visual feedback
+                setLocalActiveTab(newTab);
+                // Also call parent callback if provided (to update URL)
+                if (onTabChange) {
+                  onTabChange(newTab);
+                }
+              }}
               className={`pb-3 text-sm font-medium transition-colors flex items-center gap-2 ${
-                activeTab === tab.id
+                currentTab === tab.id
                   ? "text-[var(--text-primary)] border-b-2 border-[var(--tab-active-black)]"
                   : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
               }`}
@@ -518,8 +539,8 @@ export default function TestCaseDetails({
       </div>
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto ${activeTab === "ai-exploration" ? "p-0" : "p-6"}`}>
-        {activeTab === "overview" && (
+      <div className={`flex-1 overflow-y-auto ${currentTab === "ai-exploration" ? "p-0" : "p-6"}`}>
+        {currentTab === "overview" && (
           <div className="space-y-6">
             {/* Scenario */}
             <div>
@@ -816,7 +837,7 @@ export default function TestCaseDetails({
         />
 
         {/* Automated Steps Tab */}
-        {activeTab === "automated-steps" && (
+        {currentTab === "automated-steps" && (
           provenSteps && provenSteps.length > 0 ? (
             <div className="space-y-6">
               <div>
@@ -865,7 +886,12 @@ export default function TestCaseDetails({
                     Run this test case with the AI agent to automatically generate proven steps based on successful executions.
                   </p>
                   <button
-                    onClick={() => setActiveTab("ai-exploration")}
+                    onClick={() => {
+                      setLocalActiveTab("ai-exploration");
+                      if (onTabChange) {
+                        onTabChange("ai-exploration");
+                      }
+                    }}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--Button-primary-black)] text-white rounded-[8px] text-sm font-medium hover:opacity-90 transition-opacity"
                   >
                     Go to A.I. Exploration
@@ -877,7 +903,7 @@ export default function TestCaseDetails({
         )}
 
         {/* A.I. Exploration Tab */}
-        {activeTab === "ai-exploration" && (
+        {currentTab === "ai-exploration" && (
           <div className="flex-1 flex flex-col h-full bg-[var(--background-gray-main)]">
             {latestSession ? (
               /* Agent Execution View - Show when agent_session exists */
