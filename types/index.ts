@@ -241,6 +241,18 @@ export interface TestCaseStatus {
   updated_at: string;
 }
 
+export interface TestCaseComment {
+  id: string;
+  test_case_id: string;
+  tenant_id: string;
+  user_id: string;
+  user_email: string;
+  user_display_name: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserPreferences {
   id: string; // Same as userId
   tenant_id: string;

@@ -2,7 +2,7 @@
 
 import { TestCase, TestCaseStatus, TestCaseStep, ProvenStep } from "@/types";
 import { Edit2, Save, X, MoreVertical, Trash2 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import StatusDropdown from "./StatusDropdown";
 import ConfirmDialog from "./ConfirmDialog";
 import { useTestCaseSession } from "@/hooks/useTestCaseSession";
@@ -13,6 +13,7 @@ import SystemEventsHeader from "./SystemEventsHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/contexts/ToastContext";
+import { useTestCaseComments } from "@/hooks/useTestCaseComments";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -51,6 +52,15 @@ export default function TestCaseDetails({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [provenSteps, setProvenSteps] = useState<ProvenStep[] | undefined>(testCase.proven_steps);
   const [provenStepsCount, setProvenStepsCount] = useState<number | undefined>(testCase.proven_steps_count);
+
+  // Comments functionality
+  const { comments, loading: commentsLoading, addComment, updateComment, deleteComment } = useTestCaseComments(testCase.id, tenant?.id);
+  const [commentInput, setCommentInput] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentContent, setEditingCommentContent] = useState("");
+  const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
+  const [showDeleteCommentConfirm, setShowDeleteCommentConfirm] = useState(false);
 
   // Fetch latest agent session for this test case
   const {
@@ -203,6 +213,94 @@ export default function TestCaseDetails({
     } catch (error) {
       console.error("[TestCaseDetails] Error deleting test case:", error);
       showError("Failed to delete test case");
+    }
+  };
+
+  // Comment handlers
+  const handleSubmitComment = async () => {
+    if (!user || !commentInput.trim()) return;
+    
+    try {
+      setIsSubmittingComment(true);
+      await addComment(
+        commentInput.trim(),
+        user.uid,
+        user.email || "",
+        user.displayName || "Anonymous"
+      );
+      setCommentInput("");
+      showSuccess("Comment added");
+    } catch (error) {
+      console.error("[TestCaseDetails] Error adding comment:", error);
+      showError("Failed to add comment");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleEditComment = (commentId: string, content: string) => {
+    setEditingCommentId(commentId);
+    setEditingCommentContent(content);
+  };
+
+  const handleSaveEditComment = async (commentId: string) => {
+    if (!editingCommentContent.trim()) return;
+    
+    try {
+      setIsSubmittingComment(true);
+      await updateComment(commentId, editingCommentContent.trim());
+      setEditingCommentId(null);
+      setEditingCommentContent("");
+      showSuccess("Comment updated");
+    } catch (error) {
+      console.error("[TestCaseDetails] Error updating comment:", error);
+      showError("Failed to update comment");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    setDeleteCommentId(commentId);
+    setShowDeleteCommentConfirm(true);
+  };
+
+  const handleConfirmDeleteComment = async () => {
+    if (!deleteCommentId) return;
+    try {
+      await deleteComment(deleteCommentId);
+      showSuccess("Comment deleted");
+    } catch (error) {
+      console.error("[TestCaseDetails] Error deleting comment:", error);
+      showError("Failed to delete comment");
+    } finally {
+      setDeleteCommentId(null);
+      setShowDeleteCommentConfirm(false);
+    }
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentContent("");
+  };
+
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (date.toDateString() === today.toDateString()) {
+        return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return "Yesterday";
+      } else {
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      }
+    } catch {
+      return dateString;
     }
   };
 
@@ -592,28 +690,130 @@ export default function TestCaseDetails({
             {/* Comments */}
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
-                Comments
+                Comments {comments.length > 0 && <span className="text-xs font-normal text-[var(--text-tertiary)]">({comments.length})</span>}
               </h3>
-              <div className="border border-[var(--border-main)] rounded-[8px] p-4">
+              
+              {/* Comment Input */}
+              <div className="border border-[var(--border-main)] rounded-[8px] p-4 mb-4">
                 <textarea
-                  placeholder="Leave a comment"
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  placeholder="Leave a comment..."
                   rows={3}
-                  className="w-full bg-transparent border-0 outline-none resize-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disable)]"
+                  disabled={isSubmittingComment}
+                  className="w-full bg-transparent border-0 outline-none resize-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disable)] disabled:opacity-50"
                 />
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-light)]">
-                  <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                    <button className="hover:text-[var(--text-secondary)]">
-                      Attach files or drag & drop them
-                    </button>
-                  </div>
-                  <button className="px-4 py-1.5 bg-[var(--Button-primary-black)] text-white rounded-[6px] text-sm font-medium hover:opacity-90 transition-opacity">
-                    Leave a comment
+                <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-[var(--border-light)]">
+                  <button
+                    onClick={handleSubmitComment}
+                    disabled={isSubmittingComment || !commentInput.trim()}
+                    className="px-4 py-1.5 bg-[var(--Button-primary-black)] text-white rounded-[6px] text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingComment ? "Posting..." : "Leave a comment"}
                   </button>
                 </div>
               </div>
+
+              {/* Comments List */}
+              {commentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-[var(--text-tertiary)]">Loading comments...</div>
+                </div>
+              ) : comments.length > 0 && (
+                <div className="space-y-3">
+                  {comments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="p-3 bg-[var(--fill-tsp-white-light)] border border-[var(--border-light)] rounded-[8px] hover:border-[var(--border-main)] transition-colors"
+                    >
+                      {editingCommentId === comment.id ? (
+                        // Edit mode
+                        <div>
+                          <textarea
+                            value={editingCommentContent}
+                            onChange={(e) => setEditingCommentContent(e.target.value)}
+                            rows={3}
+                            disabled={isSubmittingComment}
+                            className="w-full px-2 py-2 bg-white border border-[var(--border-main)] rounded-[6px] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-input-active)] resize-none disabled:opacity-50"
+                          />
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              onClick={() => handleSaveEditComment(comment.id)}
+                              disabled={isSubmittingComment || !editingCommentContent.trim()}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--Button-primary-black)] text-white rounded-[4px] text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Save size={12} />
+                              <span>Save</span>
+                            </button>
+                            <button
+                              onClick={handleCancelEditComment}
+                              disabled={isSubmittingComment}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[var(--border-main)] rounded-[4px] text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)] transition-colors disabled:opacity-50"
+                            >
+                              <X size={12} />
+                              <span>Cancel</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // View mode
+                        <>
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="text-xs font-semibold text-[var(--text-primary)]">
+                                {comment.user_display_name}
+                              </p>
+                              <p className="text-xs text-[var(--text-tertiary)]">
+                                {formatDate(comment.created_at)}
+                                {comment.created_at !== comment.updated_at && " (edited)"}
+                              </p>
+                            </div>
+                            {user?.uid === comment.user_id && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleEditComment(comment.id, comment.content)}
+                                  className="p-1 hover:bg-white rounded transition-colors"
+                                  title="Edit comment"
+                                >
+                                  <Edit2 size={12} className="text-[var(--icon-secondary)]" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  className="p-1 hover:bg-white rounded transition-colors"
+                                  title="Delete comment"
+                                >
+                                  <Trash2 size={12} className="text-red-500" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap break-words">
+                            {comment.content}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
+
+        {/* Confirm Delete Comment Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteCommentConfirm}
+          title="Delete comment?"
+          message="Are you sure you want to delete this comment? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleConfirmDeleteComment}
+          onCancel={() => {
+            setShowDeleteCommentConfirm(false);
+            setDeleteCommentId(null);
+          }}
+          isDanger={true}
+        />
 
         {/* Automated Steps Tab */}
         {activeTab === "automated-steps" && (

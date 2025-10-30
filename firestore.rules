@@ -196,6 +196,28 @@ service cloud.firestore {
       // Backend can write steps
       allow write: if isAuthenticated();
     }
+    
+    // ==========================================
+    // Test Case Comments
+    // ==========================================
+    match /test_case_comments/{commentId} {
+      // Users can read comments if authenticated and belong to same tenant
+      allow read: if isAuthenticated() && 
+        belongsToTenant(resource.data.tenant_id);
+      
+      // Users can create comments for their tenant
+      allow create: if isAuthenticated() && 
+        request.resource.data.user_id == request.auth.uid &&
+        belongsToTenant(request.resource.data.tenant_id);
+      
+      // Users can update their own comments
+      allow update: if isAuthenticated() && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Users can delete their own comments
+      allow delete: if isAuthenticated() && 
+        resource.data.user_id == request.auth.uid;
+    }
   }
 }
 
