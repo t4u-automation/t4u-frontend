@@ -7,12 +7,17 @@ import { useToast } from "@/contexts/ToastContext";
 import ConfirmDialog from "./ConfirmDialog";
 
 interface TenantSettingsProps {
+  tenantId: string;
+  user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  onTenantUpdate?: (tenant: Tenant) => void;
   tenant: Tenant;
   statuses: TestCaseStatus[];
   onUpdateTenant: (name: string) => Promise<void>;
   onCreateStatus: (name: string, color: string) => Promise<void>;
   onUpdateStatus: (statusId: string, name: string, color: string) => Promise<void>;
   onDeleteStatus: (statusId: string) => Promise<void>;
+  activeSettingsTab?: "general" | "statuses";
+  onSettingsTabChange?: (tab: "general" | "statuses") => void;
 }
 
 export default function TenantSettings({
@@ -22,9 +27,20 @@ export default function TenantSettings({
   onCreateStatus,
   onUpdateStatus,
   onDeleteStatus,
+  activeSettingsTab,
+  onSettingsTabChange,
 }: TenantSettingsProps) {
   const { showSuccess: toastSuccess, showError: toastError } = useToast();
-  const [activeTab, setActiveTab] = useState<"general" | "statuses">("general");
+  const [localActiveTab, setLocalActiveTab] = useState<"general" | "statuses">("general");
+  
+  const currentTab = activeSettingsTab || localActiveTab;
+  
+  const handleTabChange = (tab: "general" | "statuses") => {
+    setLocalActiveTab(tab);
+    if (onSettingsTabChange) {
+      onSettingsTabChange(tab);
+    }
+  };
   const [tenantName, setTenantName] = useState(tenant.name);
   const [isSavingTenant, setIsSavingTenant] = useState(false);
   const [showCreateStatusModal, setShowCreateStatusModal] = useState(false);
@@ -57,9 +73,9 @@ export default function TenantSettings({
         {/* Tabs */}
         <div className="flex items-center gap-6 border-b border-[var(--border-light)] -mb-4">
           <button
-            onClick={() => setActiveTab("general")}
+            onClick={() => handleTabChange("general")}
             className={`pb-3 text-sm font-medium transition-colors ${
-              activeTab === "general"
+              currentTab === "general"
                 ? "text-[var(--text-primary)] border-b-2 border-[var(--tab-active-black)]"
                 : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
             }`}
@@ -67,9 +83,9 @@ export default function TenantSettings({
             General
           </button>
           <button
-            onClick={() => setActiveTab("statuses")}
+            onClick={() => handleTabChange("statuses")}
             className={`pb-3 text-sm font-medium transition-colors ${
-              activeTab === "statuses"
+              currentTab === "statuses"
                 ? "text-[var(--text-primary)] border-b-2 border-[var(--tab-active-black)]"
                 : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
             }`}
@@ -81,7 +97,7 @@ export default function TenantSettings({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {activeTab === "general" ? (
+        {currentTab === "general" ? (
           /* General Settings */
           <div className="max-w-2xl">
             <div className="bg-white border border-[var(--border-main)] rounded-[12px] p-6">

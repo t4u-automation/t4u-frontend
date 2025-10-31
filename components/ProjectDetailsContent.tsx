@@ -88,11 +88,14 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   );
   const [testPlans, setTestPlans] = useState<TestPlan[]>([]);
   const [selectedTestPlanId, setSelectedTestPlanId] = useState<string | null>(null);
+  const runIdParam = searchParams.get('runId') as string | null;
+  const testPlanIdParam = searchParams.get('testPlanId') as string | null;
+  const settingsTabParam = searchParams.get('settingsTab') as "general" | "statuses" | null;
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [showCreateTestPlanModal, setShowCreateTestPlanModal] = useState(false);
   const [showEditTestPlanModal, setShowEditTestPlanModal] = useState(false);
   const [editingTestPlan, setEditingTestPlan] = useState<TestPlan | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [showCreateRunModal, setShowCreateRunModal] = useState(false);
   const [showEditRunModal, setShowEditRunModal] = useState(false);
   const [editingRun, setEditingRun] = useState<Run | null>(null);
@@ -140,6 +143,26 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       setSelectedTestCaseId(testCaseIdParam);
     }
   }, []); // Only run on mount
+
+  useEffect(() => {
+    if (testPlanIdParam && !selectedTestPlanId) {
+      setSelectedTestPlanId(testPlanIdParam);
+      setActiveMenuItem("test-plans");
+    }
+  }, []); // Only run on mount
+
+  useEffect(() => {
+    if (runIdParam && !selectedRunId) {
+      setSelectedRunId(runIdParam);
+      setActiveMenuItem("runs");
+    }
+  }, []); // Only run on mount
+
+  useEffect(() => {
+    if (tabParam && tabParam !== activeMenuItem) {
+      setActiveMenuItem(tabParam);
+    }
+  }, [tabParam]);
 
   useEffect(() => {
     if (selectedTestCaseId) {
@@ -549,6 +572,27 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     router.push(`?${params.toString()}`);
   };
 
+  const handleSelectTestPlan = (testPlanId: string) => {
+    setSelectedTestPlanId(testPlanId);
+    setActiveMenuItem("test-plans");
+    router.push(`?tab=test-plans&testPlanId=${testPlanId}`);
+  };
+
+  const handleSelectRun = (runId: string) => {
+    setSelectedRunId(runId);
+    setActiveMenuItem("runs");
+    router.push(`?tab=runs&runId=${runId}`);
+  };
+
+  const handleMenuItemChange = (item: "test-cases" | "test-plans" | "runs" | "settings") => {
+    setActiveMenuItem(item);
+    router.push(`?tab=${item}`);
+  };
+
+  const handleSettingsTabChange = (tab: "general" | "statuses") => {
+    router.push(`?tab=settings&settingsTab=${tab}`);
+  };
+
   const handleMoveItem = async (targetProjectId: string) => {
     if (!moveItem || !tenant || !user) return;
 
@@ -763,12 +807,14 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
 
   const handleTestPlanSelect = (testPlanId: string) => {
     setSelectedTestPlanId(testPlanId);
+    router.push(`?tab=test-plans&testPlanId=${testPlanId}`);
   };
 
   const handleTestCaseClickFromPlan = (testCaseId: string) => {
     // Navigate to test cases tab and select the test case
     setActiveMenuItem("test-cases");
     setSelectedTestCaseId(testCaseId);
+    router.push(`?testCaseId=${testCaseId}`);
   };
 
   const handleEditTestPlan = (testPlanId: string) => {
@@ -852,6 +898,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
 
   const handleRunSelect = (runId: string) => {
     setSelectedRunId(runId);
+    router.push(`?tab=runs&runId=${runId}`);
   };
 
   const handleRerunRun = async (runId: string) => {
@@ -976,7 +1023,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
           projectId={projectId} 
           activeItem={activeMenuItem}
           isOwner={isOwner}
-          onNavigate={(item) => setActiveMenuItem(item as "test-cases" | "test-plans" | "runs" | "settings")}
+          onNavigate={handleMenuItemChange}
         />
 
         {/* Main Content - Conditional based on active menu */}
@@ -1071,6 +1118,8 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
             onCreateStatus={handleCreateStatus}
             onUpdateStatus={handleUpdateStatus}
             onDeleteStatus={handleDeleteStatus}
+            onSettingsTabChange={handleSettingsTabChange}
+            activeSettingsTab={settingsTabParam || "general"}
           />
         ) : (
           /* Test Cases View - Two Panel Layout */
