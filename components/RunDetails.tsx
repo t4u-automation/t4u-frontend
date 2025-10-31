@@ -15,9 +15,10 @@ interface RunDetailsProps {
   run: Run | null;
   testCases: TestCase[];
   onRerun?: (runId: string) => void;
+  isExecuting?: boolean;
 }
 
-export default function RunDetails({ run, testCases, onRerun }: RunDetailsProps) {
+export default function RunDetails({ run, testCases, onRerun, isExecuting }: RunDetailsProps) {
   const [expandedTestCases, setExpandedTestCases] = useState<Set<string>>(new Set());
   const [liveRun, setLiveRun] = useState<Run | null>(run);
   const [floatingVncTestCaseId, setFloatingVncTestCaseId] = useState<string | null>(null);
@@ -130,10 +131,20 @@ export default function RunDetails({ run, testCases, onRerun }: RunDetailsProps)
           {(liveRun.status === "completed" || liveRun.status === "failed") && onRerun && (
             <button
               onClick={() => onRerun(liveRun.id)}
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[var(--Button-primary-black)] text-white rounded-[8px] text-sm font-medium hover:opacity-90 transition-opacity"
+              disabled={isExecuting}
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[var(--Button-primary-black)] text-white rounded-[8px] text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Play size={16} />
-              <span>Run</span>
+              {isExecuting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={16} />
+                  <span>Run</span>
+                </>
+              )}
             </button>
           )}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Feature, Story, TestCase } from "@/types";
 
@@ -272,9 +272,10 @@ export default function CreateRunModal({
               <button
                 type="submit"
                 disabled={isSubmitting || !name.trim() || selectedTestCaseIds.size === 0}
-                className="px-4 py-2 bg-[var(--Button-primary-black)] text-white rounded-[8px] text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--Button-primary-black)] text-white rounded-[8px] text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? "Creating..." : "Create & Start Run"}
+                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                <span>{isSubmitting ? "Creating..." : "Create & Start Run"}</span>
               </button>
             </div>
           </form>

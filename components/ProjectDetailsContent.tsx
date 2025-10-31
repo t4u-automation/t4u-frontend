@@ -99,6 +99,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const [showCreateRunModal, setShowCreateRunModal] = useState(false);
   const [showEditRunModal, setShowEditRunModal] = useState(false);
   const [editingRun, setEditingRun] = useState<Run | null>(null);
+  const [executingRunId, setExecutingRunId] = useState<string | null>(null);
   const [showCreateFeatureModal, setShowCreateFeatureModal] = useState(false);
   const [autoExpandFeatureId, setAutoExpandFeatureId] = useState<string | null>(null);
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set());
@@ -883,11 +884,14 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       
       // Start the run execution
       try {
+        setExecutingRunId(newRun.id);
         await executeRun(newRun.id, tenant.id, true);
         showSuccess("Run execution started");
       } catch (execError) {
         console.error("[ProjectDetailsContent] Error starting run execution:", execError);
         showError("Run created but failed to start execution");
+      } finally {
+        setExecutingRunId(null);
       }
     } catch (error) {
       console.error("[ProjectDetailsContent] Error creating run:", error);
@@ -905,12 +909,15 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     if (!tenant) return;
 
     try {
+      setExecutingRunId(runId);
       await executeRun(runId, tenant.id, true);
       showSuccess("Run execution started");
       console.log("[ProjectDetailsContent] Rerun started for:", runId);
     } catch (error) {
       console.error("[ProjectDetailsContent] Error rerunning:", error);
       showError("Failed to start run execution");
+    } finally {
+      setExecutingRunId(null);
     }
   };
 
@@ -1086,6 +1093,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
               run={selectedRun}
               testCases={testCases}
               onRerun={handleRerunRun}
+              isExecuting={executingRunId === selectedRun?.id}
             />
             
             <CreateRunModal
