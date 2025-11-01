@@ -1,7 +1,7 @@
 "use client";
 
 import { TestPlan, Feature, Story, TestCase, TestCaseStatus } from "@/types";
-import { ChevronRight, ChevronDown, Layers, Folder } from "lucide-react";
+import { Plus, Minus, Layers, Folder } from "lucide-react";
 import { useState } from "react";
 
 interface TestPlanTestCasesTreeProps {
@@ -117,9 +117,9 @@ export default function TestPlanTestCasesTree({
                   >
                     <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
                       {isExpanded ? (
-                        <ChevronDown size={14} className="text-[var(--icon-secondary)]" />
+                        <Minus size={14} className="text-[var(--icon-secondary)]" />
                       ) : (
-                        <ChevronRight size={14} className="text-[var(--icon-secondary)]" />
+                        <Plus size={14} className="text-[var(--icon-secondary)]" />
                       )}
                     </button>
                     <Layers size={16} className="text-[var(--icon-secondary)]" />
@@ -144,9 +144,9 @@ export default function TestPlanTestCasesTree({
                             >
                               <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
                                 {isStoryExpanded ? (
-                                  <ChevronDown size={14} className="text-[var(--icon-secondary)]" />
+                                  <Minus size={14} className="text-[var(--icon-secondary)]" />
                                 ) : (
-                                  <ChevronRight size={14} className="text-[var(--icon-secondary)]" />
+                                  <Plus size={14} className="text-[var(--icon-secondary)]" />
                                 )}
                               </button>
                               <Folder size={16} className="text-[var(--icon-secondary)]" />

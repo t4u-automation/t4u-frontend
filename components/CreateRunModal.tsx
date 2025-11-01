@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, Plus, Minus } from "lucide-react";
 import { useState } from "react";
 import { Feature, Story, TestCase } from "@/types";
 
@@ -190,7 +190,13 @@ export default function CreateRunModal({
                               className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--fill-tsp-white-light)] rounded cursor-pointer"
                               onClick={() => toggleFeature(feature.id)}
                             >
-                              <span className="text-sm">{isExpanded ? "▼" : "▶"}</span>
+                              <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
+                                {isExpanded ? (
+                                  <Minus size={14} className="text-[var(--icon-secondary)]" />
+                                ) : (
+                                  <Plus size={14} className="text-[var(--icon-secondary)]" />
+                                )}
+                              </button>
                               <span className="text-sm font-medium text-[var(--text-primary)]">
                                 {feature.name}
                               </span>
@@ -210,12 +216,16 @@ export default function CreateRunModal({
                                 <div key={story.id} className="ml-4">
                                   {/* Story */}
                                   <div className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--fill-tsp-white-light)] rounded">
-                                    <span 
-                                      className="text-sm cursor-pointer"
+                                    <button 
+                                      className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded"
                                       onClick={() => toggleStory(story.id)}
                                     >
-                                      {isStoryExpanded ? "▼" : "▶"}
-                                    </span>
+                                      {isStoryExpanded ? (
+                                        <Minus size={14} className="text-[var(--icon-secondary)]" />
+                                      ) : (
+                                        <Plus size={14} className="text-[var(--icon-secondary)]" />
+                                      )}
+                                    </button>
                                     <input
                                       type="checkbox"
                                       checked={allSelected}

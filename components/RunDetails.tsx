@@ -1,7 +1,7 @@
 "use client";
 
 import { Run, TestCase, RunTestCaseResult } from "@/types";
-import { Play, CheckCircle2, XCircle, Clock, Loader2, ChevronDown, ChevronRight, Monitor, Maximize2, Minimize2, X } from "lucide-react";
+import { Play, CheckCircle2, XCircle, Clock, Loader2, Minus, Plus, Monitor, Maximize2, Minimize2, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -198,9 +198,9 @@ export default function RunDetails({ run, testCases, onRerun, isExecuting }: Run
                   >
                     <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
                       {isExpanded ? (
-                        <ChevronDown size={14} className="text-[var(--icon-secondary)]" />
+                        <Minus size={14} className="text-[var(--icon-secondary)]" />
                       ) : (
-                        <ChevronRight size={14} className="text-[var(--icon-secondary)]" />
+                        <Plus size={14} className="text-[var(--icon-secondary)]" />
                       )}
                     </button>
                     <div className="flex-shrink-0">

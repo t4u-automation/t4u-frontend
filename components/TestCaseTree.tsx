@@ -1,7 +1,7 @@
 "use client";
 
 import { Feature, Story, TestCase, TestCaseStatus } from "@/types";
-import { ChevronRight, ChevronDown, Folder, FolderOpen, Layers, Plus, Search } from "lucide-react";
+import { Plus, Minus, Folder, FolderOpen, Layers, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import TreeItemContextMenu from "./TreeItemContextMenu";
 
@@ -285,9 +285,9 @@ export default function TestCaseTree({
                   >
                     <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
                       {isExpanded ? (
-                        <ChevronDown size={14} className="text-[var(--icon-secondary)]" />
+                        <Minus size={14} className="text-[var(--icon-secondary)]" />
                       ) : (
-                        <ChevronRight size={14} className="text-[var(--icon-secondary)]" />
+                        <Plus size={14} className="text-[var(--icon-secondary)]" />
                       )}
                     </button>
                     <Layers size={16} className="text-[var(--icon-secondary)]" />
@@ -327,9 +327,9 @@ export default function TestCaseTree({
                           >
                             <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
                               {isStoryExpanded ? (
-                                <ChevronDown size={14} className="text-[var(--icon-secondary)]" />
+                                <Minus size={14} className="text-[var(--icon-secondary)]" />
                               ) : (
-                                <ChevronRight size={14} className="text-[var(--icon-secondary)]" />
+                                <Plus size={14} className="text-[var(--icon-secondary)]" />
                               )}
                             </button>
                             <Folder size={16} className="text-[var(--icon-secondary)]" />
