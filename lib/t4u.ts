@@ -132,6 +132,32 @@ export async function updateTenant(
 }
 
 /**
+ * Update tenant name after initial setup (completes onboarding)
+ * Tenant is auto-created by blocking function with temporary name
+ */
+export async function updateTenantName(
+  tenantId: string,
+  companyName: string
+): Promise<void> {
+  try {
+    const tenantRef = doc(db, "tenants", tenantId);
+    await setDoc(
+      tenantRef,
+      {
+        name: companyName,
+        needs_setup: false,
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    console.log("[T4U] Tenant name updated and setup completed:", tenantId, companyName);
+  } catch (error) {
+    console.error("[T4U] Error updating tenant name:", error);
+    throw error;
+  }
+}
+
+/**
  * Create default test case statuses for a tenant
  */
 async function createDefaultTestCaseStatuses(

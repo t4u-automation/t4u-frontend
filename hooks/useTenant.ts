@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Tenant } from "@/types";
-import { getUserTenant, createTenant, createOrUpdateUser, updateUserLastLogin } from "@/lib/t4u";
+import { getUserTenant, updateTenantName } from "@/lib/t4u";
 import { User } from "firebase/auth";
 
 export function useTenant(firebaseUser: User | null) {
@@ -25,20 +25,14 @@ export function useTenant(firebaseUser: User | null) {
 
         if (userTenant) {
           setTenant(userTenant);
-          setNeedsOnboarding(false);
-
-          // Update user's last login (preserves existing role)
-          await updateUserLastLogin(
-            firebaseUser.uid,
-            {
-              email: firebaseUser.email || "",
-              displayName: firebaseUser.displayName || "",
-              photoURL: firebaseUser.photoURL || undefined,
-            }
-          );
+          // Show onboarding if tenant needs setup (temporary name from backend)
+          setNeedsOnboarding(userTenant.needs_setup === true);
         } else {
+          // This shouldn't happen anymore - tenant is created by blocking function
+          // But handle it gracefully
           setTenant(null);
-          setNeedsOnboarding(true);
+          setNeedsOnboarding(false);
+          console.warn("[useTenant] User has no tenant - this should not happen with blocking functions");
         }
       } catch (error) {
         console.error("[useTenant] Error checking tenant:", error);
@@ -50,32 +44,30 @@ export function useTenant(firebaseUser: User | null) {
     checkTenant();
   }, [firebaseUser]);
 
-  const createNewTenant = async (companyName: string) => {
-    if (!firebaseUser) {
-      throw new Error("No user logged in");
+  const completeTenantSetup = async (companyName: string) => {
+    if (!firebaseUser || !tenant) {
+      throw new Error("No user or tenant found");
     }
 
     try {
       setLoading(true);
-      const newTenant = await createTenant(companyName, firebaseUser.uid);
       
-      // Create user profile with owner role
-      await createOrUpdateUser(
-        firebaseUser.uid,
-        newTenant.id,
-        {
-          email: firebaseUser.email || "",
-          displayName: firebaseUser.displayName || "",
-          photoURL: firebaseUser.photoURL || undefined,
-        },
-        true // isOwner
-      );
+      // Update tenant name (tenant already created by blocking function)
+      await updateTenantName(tenant.id, companyName);
 
-      setTenant(newTenant);
+      // Update local state
+      const updatedTenant = {
+        ...tenant,
+        name: companyName,
+        needs_setup: false,
+      };
+      
+      setTenant(updatedTenant);
       setNeedsOnboarding(false);
-      return newTenant;
+      
+      return updatedTenant;
     } catch (error) {
-      console.error("[useTenant] Error creating tenant:", error);
+      console.error("[useTenant] Error completing tenant setup:", error);
       throw error;
     } finally {
       setLoading(false);
@@ -86,7 +78,6 @@ export function useTenant(firebaseUser: User | null) {
     tenant,
     loading,
     needsOnboarding,
-    createNewTenant,
+    completeTenantSetup,
   };
 }
-

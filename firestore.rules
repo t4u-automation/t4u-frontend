@@ -8,15 +8,18 @@ service cloud.firestore {
     }
     
     // Helper function to check if user belongs to a specific tenant
+    // Validates tenant_id custom claim from ID token
     function belongsToTenant(tenantId) {
-      // Simplified - just check if authenticated for now
-      return isAuthenticated();
+      return isAuthenticated() && 
+             request.auth.token.tenant_id == tenantId;
     }
     
     // Helper function to check if user is tenant owner
     function isTenantOwner(tenantId) {
-      // Simplified - allow all authenticated users for now
-      return isAuthenticated();
+      // Check if user's tenant matches and fetch owner from tenant document
+      // For now, we rely on belongsToTenant for basic validation
+      return belongsToTenant(tenantId) && 
+             resource.data.owner_id == request.auth.uid;
     }
     
     // ==========================================
@@ -24,6 +27,7 @@ service cloud.firestore {
     // ==========================================
     match /tenants/{tenantId} {
       // Users can read their own tenant
+      // Special case: Allow reading if user is owner (for onboarding before claim is set)
       allow read: if isAuthenticated() && 
         (resource.data.owner_id == request.auth.uid || belongsToTenant(tenantId));
       
@@ -32,7 +36,8 @@ service cloud.firestore {
         request.resource.data.owner_id == request.auth.uid;
       
       // Only tenant owner can update or delete
-      allow update, delete: if isTenantOwner(tenantId);
+      allow update, delete: if isAuthenticated() && 
+        resource.data.owner_id == request.auth.uid;
     }
     
     // ==========================================
@@ -122,9 +127,9 @@ service cloud.firestore {
       // Any authenticated user can create default statuses (during tenant creation)
       allow create: if isAuthenticated();
       
-      // Only tenant owners can update or delete statuses
+      // All tenant members can update or delete statuses (not just owner)
       allow update, delete: if isAuthenticated() && 
-        isTenantOwner(resource.data.tenant_id);
+        belongsToTenant(resource.data.tenant_id);
     }
     
     // ==========================================

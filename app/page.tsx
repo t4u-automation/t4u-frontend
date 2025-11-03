@@ -8,7 +8,7 @@ import OnboardingScreen from '@/components/OnboardingScreen';
 
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
-  const { tenant, loading: tenantLoading, needsOnboarding, createNewTenant } = useTenant(user);
+  const { tenant, loading: tenantLoading, needsOnboarding, completeTenantSetup } = useTenant(user);
   const router = useRouter();
 
   const loading = authLoading || tenantLoading;
@@ -17,12 +17,12 @@ export default function HomePage() {
     if (!loading) {
       if (!user) {
         router.push('/login');
-      } else if (tenant) {
+      } else if (tenant && !needsOnboarding) {
         router.push('/projects');
       }
       // If needsOnboarding, stay on this page to show onboarding
     }
-  }, [user, loading, tenant, router]);
+  }, [user, loading, tenant, needsOnboarding, router]);
 
   // Show loading state
   if (loading) {
@@ -33,9 +33,9 @@ export default function HomePage() {
     );
   }
 
-  // Show onboarding if user needs it
+  // Show onboarding if tenant needs setup
   if (user && needsOnboarding) {
-    return <OnboardingScreen onSubmit={createNewTenant} />;
+    return <OnboardingScreen onSubmit={completeTenantSetup} />;
   }
 
   // Default loading (while redirecting)

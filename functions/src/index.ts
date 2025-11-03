@@ -1,5 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { beforeUserCreated, beforeUserSignedIn } from "firebase-functions/v2/identity";
+import type { BeforeCreateResponse, BeforeSignInResponse } from "firebase-functions/lib/common/providers/identity";
 
 admin.initializeApp();
 
@@ -188,4 +190,256 @@ async function removeTestCaseFromTestPlans(
     throw error;
   }
 }
+
+// ============================================
+// Helper Functions for Blocking Functions
+// ============================================
+
+/**
+ * Check if user has a pending invitation
+ */
+async function findPendingInvitation(email: string | null | undefined): Promise<any | null> {
+  if (!email) {
+    return null;
+  }
+
+  try {
+    const invitationQuery = await db
+      .collection("invitations")
+      .where("email", "==", email.toLowerCase())
+      .where("status", "==", "pending")
+      .orderBy("created_at", "desc")
+      .limit(1)
+      .get();
+
+    if (invitationQuery.empty) {
+      return null;
+    }
+
+    const invitationDoc = invitationQuery.docs[0];
+    const invitation = invitationDoc.data();
+
+    // Check if invitation has expired (optional - 7 days default)
+    const expiresAt = invitation.expires_at;
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      console.log(`Invitation for ${email} has expired`);
+      await invitationDoc.ref.update({ status: "expired" });
+      return null;
+    }
+
+    return {
+      id: invitationDoc.id,
+      ...invitation,
+    };
+  } catch (error) {
+    console.error("Error finding invitation:", error);
+    return null;
+  }
+}
+
+/**
+ * Create a new tenant for a user (owner flow)
+ */
+async function createNewTenantForUser(displayName: string, userId: string): Promise<string> {
+  const tenantRef = db.collection("tenants").doc();
+  const tenantId = tenantRef.id;
+
+  await tenantRef.set({
+    name: `${displayName}'s Team`, // Temporary name, user will update during onboarding
+    owner_id: userId,
+    is_active: true,
+    needs_setup: true, // Flag to show company name input
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log(`Created new tenant ${tenantId} for user ${userId}`);
+
+  // Create default test case statuses for the new tenant
+  await createDefaultTestCaseStatuses(tenantId);
+
+  return tenantId;
+}
+
+/**
+ * Create default test case statuses for a tenant
+ */
+async function createDefaultTestCaseStatuses(tenantId: string): Promise<void> {
+  const defaultStatuses = [
+    { name: "Draft", color: "#6B7280", order: 0 },
+    { name: "Active", color: "#10B981", order: 1 },
+  ];
+
+  const batch = db.batch();
+
+  for (const status of defaultStatuses) {
+    const statusRef = db.collection("test_case_statuses").doc();
+    batch.set(statusRef, {
+      id: statusRef.id,
+      name: status.name,
+      color: status.color,
+      order: status.order,
+      tenant_id: tenantId,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+  console.log(`Created default test case statuses for tenant ${tenantId}`);
+}
+
+// ============================================
+// Blocking Functions
+// ============================================
+
+/**
+ * Blocking Function 1: beforeUserCreated
+ * 
+ * Triggers ONLY on new user creation (first signup).
+ * Handles tenant assignment:
+ * - If user has a pending invitation → join existing tenant
+ * - If no invitation → create new tenant (owner)
+ * 
+ * Returns custom claims (tenant_id, role) which are added to the ID token.
+ */
+// @ts-expect-error - Firebase types are incorrectly defined, this is the correct usage per docs
+export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreateResponse | void> => {
+  const userEmail = event.data.email;
+  const displayName = event.data.displayName || "User";
+  const userId = event.data.uid;
+
+  console.log(`[setupNewUser] Processing new user: ${userEmail}`);
+
+  try {
+    // Step 1: Check if user has a pending invitation
+    const invitation = await findPendingInvitation(userEmail);
+
+    if (invitation) {
+      // User was invited - join existing tenant
+      console.log(`[setupNewUser] User ${userEmail} joining tenant ${invitation.tenant_id} via invitation`);
+
+      // Mark invitation as accepted
+      await db.collection("invitations").doc(invitation.id).update({
+        status: "accepted",
+        accepted_at: admin.firestore.FieldValue.serverTimestamp(),
+        accepted_by_user_id: userId,
+      });
+
+      // Return custom claims for the invited user
+      return {
+        customClaims: {
+          tenant_id: invitation.tenant_id,
+          role: invitation.role || "member",
+        },
+      };
+    }
+
+    // Step 2: No invitation - create new tenant (owner flow)
+    console.log(`[setupNewUser] Creating new tenant for ${userEmail}`);
+    const tenantId = await createNewTenantForUser(displayName, userId);
+
+    // Return custom claims for the owner
+    return {
+      customClaims: {
+        tenant_id: tenantId,
+        role: "owner",
+      },
+    };
+  } catch (error) {
+    console.error("[setupNewUser] Error:", error);
+    // Don't block user creation, but they'll need to contact support
+    // They can still sign in but won't have a tenant
+    return;
+  }
+});
+
+/**
+ * Blocking Function 2: beforeUserSignedIn
+ * 
+ * Triggers on EVERY sign-in (including first sign-in after creation).
+ * 
+ * For NEW users (first sign-in):
+ * - Creates Firestore user document using custom claims from setupNewUser
+ * 
+ * For EXISTING users:
+ * - Returns custom claims from Firestore user document
+ * 
+ * This ensures the ID token always has the tenant_id claim for security rules.
+ */
+// @ts-expect-error - Firebase types are incorrectly defined, this is the correct usage per docs
+export const addTenantClaim = beforeUserSignedIn(async (event): Promise<BeforeSignInResponse | void> => {
+  const userId = event.data.uid;
+  const userEmail = event.data.email;
+  const displayName = event.data.displayName;
+
+  console.log(`[addTenantClaim] Processing sign-in for user: ${userEmail}`);
+
+  try {
+    // Fetch user document from Firestore
+    const userDoc = await db.collection("users").doc(userId).get();
+
+    if (!userDoc.exists) {
+      // NEW USER: First sign-in after creation
+      // Get tenant_id and role from custom claims set by setupNewUser
+      const tenantId = event.data.customClaims?.tenant_id;
+      const role = event.data.customClaims?.role;
+
+      if (!tenantId) {
+        // No tenant_id in claims - something went wrong in setupNewUser
+        console.error(`[addTenantClaim] No tenant_id claim found for new user ${userId}`);
+        return;
+      }
+
+      console.log(`[addTenantClaim] Creating Firestore user document for ${userId} in tenant ${tenantId}`);
+
+      // Create Firestore user document
+      await db.collection("users").doc(userId).set({
+        id: userId,
+        email: userEmail,
+        display_name: displayName,
+        tenant_id: tenantId,
+        role: role || "member",
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        last_login_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Claims already set by setupNewUser, just return them
+      return {
+        customClaims: {
+          tenant_id: tenantId,
+          role: role || "member",
+        },
+      };
+    }
+
+    // EXISTING USER: Return claims from Firestore
+    const userData = userDoc.data();
+
+    if (!userData || !userData.tenant_id) {
+      console.error(`[addTenantClaim] User ${userId} exists but has no tenant_id`);
+      return;
+    }
+
+    console.log(`[addTenantClaim] Existing user ${userId} signing in to tenant ${userData.tenant_id}`);
+
+    // Update last login timestamp
+    await db.collection("users").doc(userId).update({
+      last_login_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Return custom claims from Firestore
+    return {
+      customClaims: {
+        tenant_id: userData.tenant_id,
+        role: userData.role || "member",
+      },
+    };
+  } catch (error) {
+    console.error("[addTenantClaim] Error:", error);
+    // Allow sign-in to continue even if there's an error
+    return;
+  }
+});
 

@@ -204,7 +204,7 @@ export default function CreateTestPlanModal({
                               className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--fill-tsp-white-light)] rounded cursor-pointer"
                               onClick={() => toggleFeature(feature.id)}
                             >
-                              <button className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
+                              <button type="button" className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded">
                                 {isExpanded ? (
                                   <Minus size={14} className="text-[var(--icon-secondary)]" />
                                 ) : (
@@ -229,6 +229,7 @@ export default function CreateTestPlanModal({
                                   {/* Story */}
                                   <div className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--fill-tsp-white-light)] rounded">
                                     <button 
+                                      type="button"
                                       className="p-0.5 hover:bg-[var(--fill-tsp-gray-main)] rounded"
                                       onClick={() => toggleStory(story.id)}
                                     >
@@ -254,7 +255,7 @@ export default function CreateTestPlanModal({
 
                                   {/* Test Cases */}
                                   {isStoryExpanded && storyTestCases.map(testCase => (
-                                    <div key={testCase.id} className="ml-6 flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--fill-tsp-white-light)] rounded">
+                                    <div key={testCase.id} className="ml-10 flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--fill-tsp-white-light)] rounded">
                                       <input
                                         type="checkbox"
                                         checked={selectedTestCaseIds.has(testCase.id)}

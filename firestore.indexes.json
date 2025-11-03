@@ -137,16 +137,92 @@
       ]
     },
     {
-      "collectionGroup": "agent_steps",
+      "collectionGroup": "invitations",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "session_id",
+          "fieldPath": "email",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "step_number",
+          "fieldPath": "status",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invitations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenant_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "test_plans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenant_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "project_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenant_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "project_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "test_case_comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenant_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "test_case_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
         }
       ]
     }

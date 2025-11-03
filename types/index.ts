@@ -135,6 +135,8 @@ export interface Tenant {
   created_at: string;
   updated_at: string;
   owner_id: string; // User who created the tenant
+  is_active: boolean; // Soft delete flag
+  needs_setup?: boolean; // True if tenant name needs to be updated after creation
 }
 
 export interface T4UUser {
@@ -300,4 +302,17 @@ export interface Run {
   results: {
     [testCaseId: string]: RunTestCaseResult;
   };
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  tenant_id: string;
+  role: "owner" | "admin" | "member";
+  status: "pending" | "accepted" | "expired" | "cancelled";
+  invited_by: string;
+  created_at: string;
+  expires_at?: string;
+  accepted_at?: string;
+  accepted_by_user_id?: string;
 }
