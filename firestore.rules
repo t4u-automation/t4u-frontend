@@ -59,9 +59,9 @@ service cloud.firestore {
       allow create: if isAuthenticated() && 
         request.resource.data.owner_id == request.auth.uid;
       
-      // Only tenant owner can update or delete
+      // Only tenant owner or admin can update or delete
       allow update, delete: if isAuthenticated() && 
-        resource.data.owner_id == request.auth.uid;
+        (resource.data.owner_id == request.auth.uid || hasTenantAdminAccess(tenantId));
     }
     
     // ==========================================

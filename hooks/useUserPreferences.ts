@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserPreferences } from "@/types";
-import { getUserPreferences, toggleProjectFavorite } from "@/lib/t4u";
+import { getUserPreferences, toggleProjectFavorite } from "@/lib/firestore/userPreferences";
 
 export function useUserPreferences(userId: string | undefined, tenantId: string | undefined) {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);

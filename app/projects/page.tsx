@@ -11,7 +11,7 @@ import { Plus, Search, LayoutGrid, List, FolderOpen, Star, Layers, Folder, Clipb
 import ProjectCard from "@/components/ProjectCard";
 import CreateProjectModal from "@/components/CreateProjectModal";
 import { Project } from "@/types";
-import { getTenantProjects, createProject } from "@/lib/t4u";
+import { getTenantProjects, createProject } from "@/lib/firestore/projects";
 
 export default function ProjectsPage() {
   const { user, loading: authLoading } = useAuth();

@@ -154,7 +154,7 @@ export default function TestCaseDetails({
 
   const clearProvenSteps = async () => {
     try {
-      const { clearTestCaseProvenSteps } = await import("@/lib/t4u");
+      const { clearTestCaseProvenSteps } = await import("@/lib/firestore/testCases");
       await clearTestCaseProvenSteps(testCase.id);
       console.log("[TestCaseDetails] Proven steps cleared");
     } catch (error) {

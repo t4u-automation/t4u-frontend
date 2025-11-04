@@ -15,7 +15,7 @@ import {
   createTestCaseComment,
   updateTestCaseComment,
   deleteTestCaseComment,
-} from "@/lib/t4u";
+} from "@/lib/firestore/testCaseComments";
 
 export function useTestCaseComments(
   testCaseId: string | undefined,

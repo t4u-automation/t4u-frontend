@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Tenant } from "@/types";
-import { getUserTenant, updateTenantName } from "@/lib/t4u";
+import { getUserTenant, updateTenantName } from "@/lib/firestore/tenants";
 import { User } from "firebase/auth";
 
 export function useTenant(firebaseUser: User | null) {

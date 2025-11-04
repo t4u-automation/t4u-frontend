@@ -26,47 +26,48 @@ import EditRunModal from "@/components/EditRunModal";
 import { useToast } from "@/contexts/ToastContext";
 import { executeRun } from "@/lib/api";
 import { Feature, Story, TestCase, TestCaseStatus, T4UUser, Project, TestPlan, Run, Invitation } from "@/types";
+import { getProjectTestPlans, createTestPlan, updateTestPlan, deleteTestPlan } from "@/lib/firestore/testPlans";
+import { getProjectRuns, createRun, updateRun, deleteRun } from "@/lib/firestore/runs";
+import { getTenantUsers } from "@/lib/firestore/users";
+import { getTenantInvitations } from "@/lib/firestore/invitations";
+import { createInvitation } from "@/lib/firestore/invitations";
+import { cancelInvitation, resendInvitation } from "@/lib/firestore/invitations";
+import { removeUserFromTenant } from "@/lib/firestore/users";
 import {
   getProjectFeatures,
-  getFeatureStories,
-  getStoryTestCases,
-  getTenantTestCaseStatuses,
-  getTenantProjects,
-  updateTenant,
-  createTestCaseStatus,
-  updateTestCaseStatus,
-  deleteTestCaseStatus as deleteTestCaseStatusConfig,
   createFeature,
+  updateFeature,
+  deleteFeature,
+} from "@/lib/firestore/features";
+import {
+  getFeatureStories,
   createStory,
+  updateStory,
+  deleteStory,
+  cloneStory,
+} from "@/lib/firestore/stories";
+import {
+  getStoryTestCases,
   createTestCase,
   updateTestCase,
   updateTestCaseStatusId,
-  deleteFeature,
-  deleteStory,
   deleteTestCase,
+  cloneTestCase,
+  moveTestCaseToProject,
+} from "@/lib/firestore/testCases";
+import {
+  cloneFeature,
   moveFeatureToProject,
   moveStoryToProject,
-  moveTestCaseToProject,
-  cloneFeature,
-  cloneStory,
-  cloneTestCase,
-  updateFeature,
-  updateStory,
-  getProjectTestPlans,
-  createTestPlan,
-  updateTestPlan,
-  deleteTestPlan,
-  getProjectRuns,
-  createRun,
-  updateRun,
-  deleteRun,
-  getTenantUsers,
-  getTenantInvitations,
-  createInvitation,
-  cancelInvitation,
-  resendInvitation,
-  removeUserFromTenant,
-} from "@/lib/t4u";
+} from "@/lib/firestore/moveAndClone";
+import {
+  getTenantTestCaseStatuses,
+  createTestCaseStatus,
+  updateTestCaseStatus,
+  deleteTestCaseStatus as deleteTestCaseStatusConfig,
+} from "@/lib/firestore/testCaseStatuses";
+import { getTenantProjects } from "@/lib/firestore/projects";
+import { updateTenant } from "@/lib/firestore/tenants";
 
 interface ProjectDetailsContentProps {
   projectId: string;
@@ -1126,6 +1127,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
           projectId={projectId} 
           activeItem={activeMenuItem}
           isOwner={isOwner}
+          canManageTeam={canManageTeam}
           onNavigate={handleMenuItemChange}
         />
 
