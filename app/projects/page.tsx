@@ -6,11 +6,13 @@ import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useToast } from "@/contexts/ToastContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import Header from "@/components/Header";
 import { Plus, Search, LayoutGrid, List, FolderOpen, Star, Layers, Folder, ClipboardCheck } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
 import CreateProjectModal from "@/components/CreateProjectModal";
-import { Project } from "@/types";
+import { Project, T4UUser } from "@/types";
 import { getTenantProjects, createProject } from "@/lib/firestore/projects";
 
 export default function ProjectsPage() {
@@ -28,6 +30,7 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [userRole, setUserRole] = useState<T4UUser["role"] | null>(null);
 
   const loading = authLoading || tenantLoading;
   const favoriteProjectIds = new Set(favoriteProjects);
@@ -47,6 +50,28 @@ export default function ProjectsPage() {
       loadProjects();
     }
   }, [tenant]);
+
+  useEffect(() => {
+    if (user) {
+      checkUserRole();
+    }
+  }, [user]);
+
+  const checkUserRole = async () => {
+    if (!user) return;
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as T4UUser;
+        setUserRole(userData.role);
+      }
+    } catch (error) {
+      console.error("[ProjectsPage] Error checking user role:", error);
+    }
+  };
 
   const loadProjects = async () => {
     if (!tenant) return;
@@ -108,7 +133,7 @@ export default function ProjectsPage() {
 
   return (
     <div id="ProjectsPage" className="flex flex-col h-screen bg-[var(--background-gray-main)]">
-      <Header showSidebarToggle={false} isSmallScreen={false} />
+      <Header showSidebarToggle={false} isSmallScreen={false} showSettingsButton={true} userRole={userRole} />
 
       <div className="flex-1 overflow-auto px-8 py-6">
         {/* Page Header */}

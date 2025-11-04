@@ -11,7 +11,6 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import ProjectSidebar from "@/components/ProjectSidebar";
 import TestCaseTree from "@/components/TestCaseTree";
 import TestCaseDetails from "@/components/TestCaseDetails";
-import TenantSettings from "@/components/TenantSettings";
 import CreateFeatureModal from "@/components/CreateFeatureModal";
 import MoveToProjectModal from "@/components/MoveToProjectModal";
 import RenameModal from "@/components/RenameModal";
@@ -25,14 +24,9 @@ import CreateRunModal from "@/components/CreateRunModal";
 import EditRunModal from "@/components/EditRunModal";
 import { useToast } from "@/contexts/ToastContext";
 import { executeRun } from "@/lib/api";
-import { Feature, Story, TestCase, TestCaseStatus, T4UUser, Project, TestPlan, Run, Invitation } from "@/types";
+import { Feature, Story, TestCase, TestCaseStatus, T4UUser, Project, TestPlan, Run } from "@/types";
 import { getProjectTestPlans, createTestPlan, updateTestPlan, deleteTestPlan } from "@/lib/firestore/testPlans";
 import { getProjectRuns, createRun, updateRun, deleteRun } from "@/lib/firestore/runs";
-import { getTenantUsers } from "@/lib/firestore/users";
-import { getTenantInvitations } from "@/lib/firestore/invitations";
-import { createInvitation } from "@/lib/firestore/invitations";
-import { cancelInvitation, resendInvitation } from "@/lib/firestore/invitations";
-import { removeUserFromTenant } from "@/lib/firestore/users";
 import {
   getProjectFeatures,
   createFeature,
@@ -62,12 +56,8 @@ import {
 } from "@/lib/firestore/moveAndClone";
 import {
   getTenantTestCaseStatuses,
-  createTestCaseStatus,
-  updateTestCaseStatus,
-  deleteTestCaseStatus as deleteTestCaseStatusConfig,
 } from "@/lib/firestore/testCaseStatuses";
 import { getTenantProjects } from "@/lib/firestore/projects";
-import { updateTenant } from "@/lib/firestore/tenants";
 
 interface ProjectDetailsContentProps {
   projectId: string;
@@ -85,23 +75,17 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [statuses, setStatuses] = useState<TestCaseStatus[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [members, setMembers] = useState<T4UUser[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [teamLoading, setTeamLoading] = useState(false);
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isOwner, setIsOwner] = useState(false);
-  const [userRole, setUserRole] = useState<T4UUser["role"] | null>(null);
-  const tabParam = searchParams.get('tab') as "test-cases" | "test-plans" | "runs" | "settings" | null;
+  const tabParam = searchParams.get('tab') as "test-cases" | "test-plans" | "runs" | null;
   const testCaseIdParam = searchParams.get('testCaseId') as string | null;
-  const [activeMenuItem, setActiveMenuItem] = useState<"test-cases" | "test-plans" | "runs" | "settings">(
-    tabParam && ["test-cases", "test-plans", "runs", "settings"].includes(tabParam) ? tabParam : "test-cases"
+  const [activeMenuItem, setActiveMenuItem] = useState<"test-cases" | "test-plans" | "runs">(
+    tabParam && ["test-cases", "test-plans", "runs"].includes(tabParam) ? tabParam : "test-cases"
   );
   const [testPlans, setTestPlans] = useState<TestPlan[]>([]);
   const [selectedTestPlanId, setSelectedTestPlanId] = useState<string | null>(null);
   const runIdParam = searchParams.get('runId') as string | null;
   const testPlanIdParam = searchParams.get('testPlanId') as string | null;
-  const settingsTabParam = searchParams.get('settingsTab') as "general" | "team" | "statuses" | null;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [showCreateTestPlanModal, setShowCreateTestPlanModal] = useState(false);
   const [showEditTestPlanModal, setShowEditTestPlanModal] = useState(false);
@@ -217,36 +201,6 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     }
   };
 
-  const loadTeamData = async (showSpinner: boolean = true) => {
-    if (!tenant) return;
-
-    try {
-      if (showSpinner) {
-        setTeamLoading(true);
-      }
-
-      const [tenantUsers, tenantInvitations] = await Promise.all([
-        getTenantUsers(tenant.id),
-        getTenantInvitations(tenant.id),
-      ]);
-
-      setMembers(tenantUsers);
-      setInvitations(tenantInvitations);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error loading team data:", error);
-    } finally {
-      if (showSpinner) {
-        setTeamLoading(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (tenant) {
-      void loadTeamData();
-    }
-  }, [tenant?.id]);
-
   // Real-time listener for runs
   useEffect(() => {
     if (!tenant) return;
@@ -324,30 +278,6 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     }
   };
 
-  // Check if user is tenant owner
-  useEffect(() => {
-    if (user && tenant) {
-      checkUserRole();
-    }
-  }, [user, tenant]);
-
-  const checkUserRole = async () => {
-    if (!user) return;
-
-    try {
-      const userRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as T4UUser;
-        setIsOwner(userData.role === "owner");
-        setUserRole(userData.role);
-      }
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error checking user role:", error);
-    }
-  };
-
   const loadProjectData = async () => {
     if (!tenant) return;
 
@@ -397,114 +327,6 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const selectedStatus = selectedTestCase
     ? statuses.find((s) => s.id === selectedTestCase.status_id)
     : undefined;
-  const canManageTeam = userRole === "owner" || userRole === "admin";
-  const currentUserId = user?.uid ?? null;
-
-  const handleUpdateTenant = async (name: string) => {
-    if (!tenant) return;
-
-    try {
-      await updateTenant(tenant.id, { name });
-      console.log("[ProjectDetailsContent] Tenant name updated successfully");
-      // Note: The tenant state in useTenant will auto-update on next navigation
-      // For now, we'll show success without reload
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error updating tenant:", error);
-      throw error;
-    }
-  };
-
-  const handleCreateStatus = async (name: string, color: string) => {
-    if (!tenant) return;
-
-    try {
-      const newStatus = await createTestCaseStatus(tenant.id, name, color);
-      setStatuses([...statuses, newStatus]);
-      console.log("[ProjectDetailsContent] Status created:", newStatus.id);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error creating status:", error);
-      throw error;
-    }
-  };
-
-  const handleUpdateStatus = async (statusId: string, name: string, color: string) => {
-    try {
-      await updateTestCaseStatus(statusId, { name, color });
-      // Update local state
-      setStatuses(
-        statuses.map((s) => (s.id === statusId ? { ...s, name, color } : s))
-      );
-      console.log("[ProjectDetailsContent] Status updated:", statusId);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error updating status:", error);
-      throw error;
-    }
-  };
-
-  const handleInviteMember = async (email: string, role: Invitation["role"]) => {
-    if (!tenant || !user) {
-      throw new Error("Unable to send invitation without tenant context");
-    }
-
-    try {
-      await createInvitation(tenant.id, user.uid, email, role);
-      await loadTeamData(false);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error creating invitation:", error);
-      throw error;
-    }
-  };
-
-  const handleCancelInvitation = async (invitationId: string) => {
-    if (!user) {
-      throw new Error("Unable to cancel invitation without user context");
-    }
-
-    try {
-      await cancelInvitation(invitationId, user.uid);
-      await loadTeamData(false);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error cancelling invitation:", error);
-      throw error;
-    }
-  };
-
-  const handleResendInvitation = async (invitationId: string) => {
-    if (!user) {
-      throw new Error("Unable to resend invitation without user context");
-    }
-
-    try {
-      await resendInvitation(invitationId, user.uid);
-      await loadTeamData(false);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error resending invitation:", error);
-      throw error;
-    }
-  };
-
-  const handleRemoveUser = async (userId: string) => {
-    try {
-      await removeUserFromTenant(userId);
-      await loadTeamData(false);
-      showSuccess("User removed successfully");
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error removing user:", error);
-      throw error;
-    }
-  };
-
-  const handleDeleteStatus = async (statusId: string) => {
-    try {
-      await deleteTestCaseStatusConfig(statusId);
-      // Remove from local state
-      setStatuses(statuses.filter((s) => s.id !== statusId));
-      console.log("[ProjectDetailsContent] Status deleted:", statusId);
-    } catch (error) {
-      console.error("[ProjectDetailsContent] Error deleting status:", error);
-      throw error;
-    }
-  };
 
   const handleCreateFeature = async (name: string, description?: string) => {
     if (!tenant || !user) return;
@@ -682,13 +504,9 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     router.push(`?tab=runs&runId=${runId}`);
   };
 
-  const handleMenuItemChange = (item: "test-cases" | "test-plans" | "runs" | "settings") => {
+  const handleMenuItemChange = (item: "test-cases" | "test-plans" | "runs") => {
     setActiveMenuItem(item);
     router.push(`?tab=${item}`);
-  };
-
-  const handleSettingsTabChange = (tab: "general" | "team" | "statuses") => {
-    router.push(`?tab=settings&settingsTab=${tab}`);
   };
 
   const handleMoveItem = async (targetProjectId: string) => {
@@ -1126,8 +944,6 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
         <ProjectSidebar 
           projectId={projectId} 
           activeItem={activeMenuItem}
-          isOwner={isOwner}
-          canManageTeam={canManageTeam}
           onNavigate={handleMenuItemChange}
         />
 
@@ -1216,26 +1032,6 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
               testCases={testCases}
             />
           </>
-        ) : activeMenuItem === "settings" && tenant ? (
-          <TenantSettings
-            tenant={tenant}
-            statuses={statuses}
-            members={members}
-            invitations={invitations}
-            isTeamLoading={teamLoading}
-            onUpdateTenant={handleUpdateTenant}
-            onCreateStatus={handleCreateStatus}
-            onUpdateStatus={handleUpdateStatus}
-            onDeleteStatus={handleDeleteStatus}
-            onInviteMember={handleInviteMember}
-            onCancelInvitation={handleCancelInvitation}
-            onResendInvitation={handleResendInvitation}
-            onRemoveUser={handleRemoveUser}
-            canManageTeam={canManageTeam}
-            currentUserId={currentUserId}
-            onSettingsTabChange={handleSettingsTabChange}
-            activeSettingsTab={settingsTabParam || "general"}
-          />
         ) : (
           /* Test Cases View - Two Panel Layout */
           <div className="flex flex-1 overflow-hidden">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, Monitor, PanelLeft } from "lucide-react";
+import { LogOut, Monitor, PanelLeft, Settings } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +13,8 @@ interface HeaderProps {
   showSidebarToggle?: boolean;
   onSidebarToggle?: () => void;
   isSmallScreen?: boolean;
+  showSettingsButton?: boolean;
+  userRole?: string | null;
 }
 
 export default function Header({
@@ -22,6 +24,8 @@ export default function Header({
   showSidebarToggle = false,
   onSidebarToggle,
   isSmallScreen = false,
+  showSettingsButton = false,
+  userRole = null,
 }: HeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -92,6 +96,20 @@ export default function Header({
                 className={`${
                   isVNCActive ? "text-green-500" : "text-[var(--icon-primary)]"
                 }`}
+              />
+            </button>
+          )}
+
+          {/* Settings Button - only show for admin/owner */}
+          {showSettingsButton && (userRole === "owner" || userRole === "admin") && (
+            <button
+              onClick={() => router.push("/settings")}
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-[var(--border-main)] hover:bg-[var(--fill-tsp-gray-main)] transition-colors"
+              title="Settings"
+            >
+              <Settings
+                size={16}
+                className="text-[var(--icon-primary)]"
               />
             </button>
           )}
