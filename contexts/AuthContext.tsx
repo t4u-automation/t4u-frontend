@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import {
   User,
   GoogleAuthProvider,
+  GithubAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
@@ -14,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithGithub: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
 }
@@ -41,7 +43,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await result.user.getIdToken();
       localStorage.setItem("firebase_token", token);
     } catch (error) {
-      console.error("[AuthContext] Sign in error:", error);
+      console.error("[AuthContext] Sign in with Google error:", error);
+      throw error;
+    }
+  };
+
+  const signInWithGithub = async () => {
+    const provider = new GithubAuthProvider();
+    // Request email scope
+    provider.addScope("user:email");
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // Store token
+      const token = await result.user.getIdToken();
+      localStorage.setItem("firebase_token", token);
+    } catch (error) {
+      console.error("[AuthContext] Sign in with GitHub error:", error);
       throw error;
     }
   };
@@ -73,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, refreshToken }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithGithub, logout, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );

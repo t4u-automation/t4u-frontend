@@ -33,6 +33,10 @@ export default function Header({
     router.push("/login");
   };
 
+  const handleLogoClick = () => {
+    router.push("/projects");
+  };
+
   return (
     <div
       id="Header"
@@ -53,14 +57,15 @@ export default function Header({
 
           {/* Logo - always show on desktop, hidden on mobile when sidebar toggle is shown */}
           {(!isSmallScreen || !showSidebarToggle) && (
-            <div
+            <button
               id="Logo"
-              className="h-8 relative z-20 overflow-hidden flex gap-2 items-center"
+              onClick={handleLogoClick}
+              className="h-8 relative z-20 overflow-hidden flex gap-2 items-center cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-none p-0"
             >
               <span className="text-2xl font-bold text-[var(--logo-color)]">
                 T4U
               </span>
-            </div>
+            </button>
           )}
         </div>
 
