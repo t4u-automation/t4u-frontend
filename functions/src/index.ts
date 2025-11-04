@@ -1,11 +1,101 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import sgMail from "@sendgrid/mail";
 import { beforeUserCreated, beforeUserSignedIn } from "firebase-functions/v2/identity";
 import type { BeforeCreateResponse, BeforeSignInResponse } from "firebase-functions/lib/common/providers/identity";
 
 admin.initializeApp();
 
 const db = admin.firestore();
+
+// Configuration using environment variables (works with both v1 and v2 functions)
+const DEFAULT_APP_BASE_URL = "https://t4u.dev";
+const DEFAULT_INVITATION_PATH = "/login";
+const DEFAULT_FROM_EMAIL = "no-reply@t4u.dev";
+const DEFAULT_FROM_NAME = "T4U";
+
+// For v1 functions, we'll access config dynamically when needed
+// For v2 functions (blocking functions), only environment variables work
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || DEFAULT_FROM_EMAIL;
+const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || DEFAULT_FROM_NAME;
+const APP_BASE_URL = process.env.APP_BASE_URL || DEFAULT_APP_BASE_URL;
+const INVITATION_PATH = process.env.INVITATION_PATH || DEFAULT_INVITATION_PATH;
+
+const IS_SENDGRID_CONFIGURED = typeof SENDGRID_API_KEY === "string" && SENDGRID_API_KEY.length > 0;
+
+if (IS_SENDGRID_CONFIGURED) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+} else {
+  console.warn("[init] SendGrid API key not configured; invitation emails are disabled.");
+}
+
+function normalizeBaseUrl(baseUrl: string): string {
+  if (!/^https?:\/\//i.test(baseUrl)) {
+    return `https://${baseUrl}`;
+  }
+  return baseUrl;
+}
+
+function buildInvitationUrl(invitationId: string, email?: string | null): string {
+  const normalizedBase = normalizeBaseUrl(APP_BASE_URL);
+  const targetPath = INVITATION_PATH || DEFAULT_INVITATION_PATH;
+  const invitationUrl = new URL(targetPath, normalizedBase);
+  invitationUrl.searchParams.set("invitation", invitationId);
+
+  if (email) {
+    invitationUrl.searchParams.set("email", email.toLowerCase());
+  }
+
+  return invitationUrl.toString();
+}
+
+async function getTenantDisplayName(tenantId: string | undefined): Promise<string> {
+  if (!tenantId) {
+    return "your T4U workspace";
+  }
+
+  try {
+    const tenantDoc = await db.collection("tenants").doc(tenantId).get();
+
+    if (tenantDoc.exists) {
+      const tenantData = tenantDoc.data() as { name?: string } | undefined;
+      if (tenantData?.name) {
+        return tenantData.name;
+      }
+    }
+  } catch (error) {
+    console.error(`[sendInvitationEmail] Failed to fetch tenant ${tenantId}:`, error);
+  }
+
+  return "your T4U workspace";
+}
+
+async function getInviterDisplayName(inviterUserId: string | undefined): Promise<string | null> {
+  if (!inviterUserId) {
+    return null;
+  }
+
+  try {
+    const inviterDoc = await db.collection("users").doc(inviterUserId).get();
+
+    if (inviterDoc.exists) {
+      const inviterData = inviterDoc.data() as { display_name?: string; email?: string } | undefined;
+
+      if (inviterData?.display_name) {
+        return inviterData.display_name;
+      }
+
+      if (inviterData?.email) {
+        return inviterData.email;
+      }
+    }
+  } catch (error) {
+    console.error(`[sendInvitationEmail] Failed to fetch inviter ${inviterUserId}:`, error);
+  }
+
+  return null;
+}
 
 /**
  * Firestore Trigger: Update project stats when test_cases are created or deleted
@@ -192,6 +282,147 @@ async function removeTestCaseFromTestPlans(
 }
 
 // ============================================
+// Invitation Email Trigger
+// ============================================
+
+export const sendInvitationEmail = functions.firestore
+  .document("invitations/{invitationId}")
+  .onCreate(async (snapshot, context) => {
+    const invitationId = context.params.invitationId;
+
+    // For v1 functions, try to get SendGrid API key from config if not in env
+    let sendgridApiKey = process.env.SENDGRID_API_KEY;
+    if (!sendgridApiKey) {
+      try {
+        const config = functions.config();
+        sendgridApiKey = config?.sendgrid?.api_key;
+        if (sendgridApiKey) {
+          sgMail.setApiKey(sendgridApiKey);
+        }
+      } catch (error) {
+        console.warn("[sendInvitationEmail] Could not access functions.config():", error);
+      }
+    }
+
+    if (!sendgridApiKey) {
+      console.warn(
+        `[sendInvitationEmail] SendGrid API key not configured; skipping invitation ${invitationId}`
+      );
+      return;
+    }
+
+    const invitation = snapshot.data();
+
+    if (!invitation) {
+      console.warn(`[sendInvitationEmail] Invitation ${invitationId} has no data; skipping email.`);
+      return;
+    }
+
+    const email = (invitation.email as string | undefined)?.toLowerCase();
+    const status = invitation.status as string | undefined;
+    const tenantId = invitation.tenant_id as string | undefined;
+    const invitedBy = invitation.invited_by as string | undefined;
+
+    if (!email) {
+      console.error(`[sendInvitationEmail] Invitation ${invitationId} is missing an email value.`);
+      return;
+    }
+
+    if (status && status !== "pending") {
+      console.log(
+        `[sendInvitationEmail] Invitation ${invitationId} has status ${status}; not sending email.`
+      );
+      return;
+    }
+
+    const invitationUrl = buildInvitationUrl(invitationId, email);
+
+    try {
+      const [tenantName, inviterName] = await Promise.all([
+        getTenantDisplayName(tenantId),
+        getInviterDisplayName(invitedBy),
+      ]);
+
+      const subjectWorkspaceName =
+        tenantName === "your T4U workspace" ? "T4U" : tenantName;
+
+      const subject = inviterName
+        ? `${inviterName} invited you to join ${subjectWorkspaceName} on T4U`
+        : `You're invited to join ${subjectWorkspaceName} on T4U`;
+
+      const textLines = [
+        "Hello,",
+        "",
+        inviterName
+          ? `${inviterName} has invited you to join ${tenantName} on T4U.`
+          : `You have been invited to join ${tenantName} on T4U.`,
+        "",
+        `Accept your invitation: ${invitationUrl}`,
+        "",
+        "If you did not expect this invitation, you can ignore this email.",
+      ].filter(Boolean) as string[];
+
+      const text = textLines.join("\n");
+
+      const html = `
+        <p>Hello,</p>
+        <p>${
+          inviterName
+            ? `<strong>${inviterName}</strong> has invited you`
+            : "You have been invited"
+        } to join <strong>${tenantName}</strong> on T4U.</p>
+        <p>
+          <a href="${invitationUrl}" style="display:inline-block;padding:12px 20px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:6px;">
+            Accept invitation
+          </a>
+        </p>
+        <p>Or copy and paste this link into your browser:<br/><a href="${invitationUrl}">${invitationUrl}</a></p>
+        <p>If you did not expect this invitation, you can ignore this email.</p>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: SENDGRID_FROM_EMAIL,
+          name: SENDGRID_FROM_NAME,
+        },
+        subject,
+        text,
+        html,
+      };
+
+      await sgMail.send(msg);
+
+      await snapshot.ref.set(
+        {
+          last_email_attempt_at: admin.firestore.FieldValue.serverTimestamp(),
+          last_email_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+          last_email_error: admin.firestore.FieldValue.delete(),
+          send_count: admin.firestore.FieldValue.increment(1),
+        },
+        { merge: true }
+      );
+
+      console.log(
+        `[sendInvitationEmail] Invitation email sent to ${email} for invitation ${invitationId}`
+      );
+    } catch (error) {
+      console.error(`[sendInvitationEmail] Failed to send invitation ${invitationId}:`, error);
+
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+
+      await snapshot.ref.set(
+        {
+          last_email_attempt_at: admin.firestore.FieldValue.serverTimestamp(),
+          last_email_error: errorMessage,
+          send_count: admin.firestore.FieldValue.increment(1),
+        },
+        { merge: true }
+      );
+    }
+  });
+
+// ============================================
 // Helper Functions for Blocking Functions
 // ============================================
 
@@ -200,29 +431,38 @@ async function removeTestCaseFromTestPlans(
  */
 async function findPendingInvitation(email: string | null | undefined): Promise<any | null> {
   if (!email) {
+    console.log("[findPendingInvitation] No email provided");
     return null;
   }
+
+  const normalizedEmail = email.toLowerCase();
+  console.log(`[findPendingInvitation] Searching for invitation for: ${normalizedEmail}`);
 
   try {
     const invitationQuery = await db
       .collection("invitations")
-      .where("email", "==", email.toLowerCase())
+      .where("email", "==", normalizedEmail)
       .where("status", "==", "pending")
       .orderBy("created_at", "desc")
       .limit(1)
       .get();
 
+    console.log(`[findPendingInvitation] Found ${invitationQuery.size} pending invitations`);
+
     if (invitationQuery.empty) {
+      console.log(`[findPendingInvitation] No pending invitation found for ${normalizedEmail}`);
       return null;
     }
 
     const invitationDoc = invitationQuery.docs[0];
     const invitation = invitationDoc.data();
 
+    console.log(`[findPendingInvitation] Found invitation ${invitationDoc.id} for tenant ${invitation.tenant_id}`);
+
     // Check if invitation has expired (optional - 7 days default)
     const expiresAt = invitation.expires_at;
     if (expiresAt && new Date(expiresAt) < new Date()) {
-      console.log(`Invitation for ${email} has expired`);
+      console.log(`[findPendingInvitation] Invitation for ${normalizedEmail} has expired`);
       await invitationDoc.ref.update({ status: "expired" });
       return null;
     }
@@ -232,7 +472,7 @@ async function findPendingInvitation(email: string | null | undefined): Promise<
       ...invitation,
     };
   } catch (error) {
-    console.error("Error finding invitation:", error);
+    console.error("[findPendingInvitation] Error finding invitation:", error);
     return null;
   }
 }
@@ -290,6 +530,42 @@ async function createDefaultTestCaseStatuses(tenantId: string): Promise<void> {
 }
 
 // ============================================
+// User Management Functions
+// ============================================
+
+/**
+ * Firestore Trigger: Delete user from Firebase Auth when user doc is deleted
+ * Security rules ensure only owners/admins can delete user docs
+ */
+export const deleteUserFromAuth = functions.firestore
+  .document("users/{userId}")
+  .onDelete(async (snapshot, context) => {
+    const userId = context.params.userId;
+    const userData = snapshot.data();
+
+    console.log(`[deleteUserFromAuth] User document deleted for ${userId} (${userData?.email})`);
+
+    // Additional safety check: Don't delete tenant owners
+    if (userData?.role === "owner") {
+      console.error(`[deleteUserFromAuth] Attempted to delete owner ${userId}, skipping Auth deletion`);
+      return;
+    }
+
+    try {
+      // Delete user from Firebase Auth
+      await admin.auth().deleteUser(userId);
+      console.log(`[deleteUserFromAuth] Successfully deleted Firebase Auth user ${userId}`);
+    } catch (error: any) {
+      // Log error but don't fail - Firestore doc is already deleted
+      if (error.code === "auth/user-not-found") {
+        console.log(`[deleteUserFromAuth] User ${userId} already deleted from Auth`);
+      } else {
+        console.error(`[deleteUserFromAuth] Failed to delete Auth user ${userId}:`, error);
+      }
+    }
+  });
+
+// ============================================
 // Blocking Functions
 // ============================================
 
@@ -313,11 +589,12 @@ export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreat
 
   try {
     // Step 1: Check if user has a pending invitation
+    console.log(`[setupNewUser] Checking for pending invitation for ${userEmail}`);
     const invitation = await findPendingInvitation(userEmail);
 
     if (invitation) {
       // User was invited - join existing tenant
-      console.log(`[setupNewUser] User ${userEmail} joining tenant ${invitation.tenant_id} via invitation`);
+      console.log(`[setupNewUser] ✅ User ${userEmail} joining tenant ${invitation.tenant_id} via invitation ${invitation.id} with role ${invitation.role}`);
 
       // Mark invitation as accepted
       await db.collection("invitations").doc(invitation.id).update({
@@ -325,6 +602,8 @@ export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreat
         accepted_at: admin.firestore.FieldValue.serverTimestamp(),
         accepted_by_user_id: userId,
       });
+
+      console.log(`[setupNewUser] Invitation ${invitation.id} marked as accepted`);
 
       // Return custom claims for the invited user
       return {
@@ -336,8 +615,10 @@ export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreat
     }
 
     // Step 2: No invitation - create new tenant (owner flow)
-    console.log(`[setupNewUser] Creating new tenant for ${userEmail}`);
+    console.log(`[setupNewUser] ⚠️ No invitation found, creating new tenant for ${userEmail}`);
     const tenantId = await createNewTenantForUser(displayName, userId);
+
+    console.log(`[setupNewUser] Created new tenant ${tenantId} for user ${userId} as owner`);
 
     // Return custom claims for the owner
     return {
@@ -347,7 +628,7 @@ export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreat
       },
     };
   } catch (error) {
-    console.error("[setupNewUser] Error:", error);
+    console.error("[setupNewUser] ❌ Error:", error);
     // Don't block user creation, but they'll need to contact support
     // They can still sign in but won't have a tenant
     return;
@@ -381,17 +662,38 @@ export const addTenantClaim = beforeUserSignedIn(async (event): Promise<BeforeSi
 
     if (!userDoc.exists) {
       // NEW USER: First sign-in after creation
-      // Get tenant_id and role from custom claims set by setupNewUser
-      const tenantId = event.data.customClaims?.tenant_id;
-      const role = event.data.customClaims?.role;
+      // First, check if there's a pending invitation (fallback if setupNewUser didn't handle it)
+      console.log(`[addTenantClaim] New user ${userEmail}, checking for pending invitation`);
+      const invitation = await findPendingInvitation(userEmail);
 
-      if (!tenantId) {
-        // No tenant_id in claims - something went wrong in setupNewUser
-        console.error(`[addTenantClaim] No tenant_id claim found for new user ${userId}`);
-        return;
+      let tenantId: string | undefined;
+      let role: string;
+
+      if (invitation) {
+        // Found invitation - use invitation's tenant and role
+        console.log(`[addTenantClaim] 🎉 Found pending invitation for ${userEmail}, joining tenant ${invitation.tenant_id}`);
+        tenantId = invitation.tenant_id;
+        role = invitation.role || "member";
+
+        // Mark invitation as accepted
+        await db.collection("invitations").doc(invitation.id).update({
+          status: "accepted",
+          accepted_at: admin.firestore.FieldValue.serverTimestamp(),
+          accepted_by_user_id: userId,
+        });
+      } else {
+        // No invitation - use claims from setupNewUser
+        tenantId = event.data.customClaims?.tenant_id;
+        role = event.data.customClaims?.role || "member";
+
+        if (!tenantId) {
+          // No tenant_id in claims and no invitation - something went wrong
+          console.error(`[addTenantClaim] No tenant_id claim found and no invitation for new user ${userId}`);
+          return;
+        }
       }
 
-      console.log(`[addTenantClaim] Creating Firestore user document for ${userId} in tenant ${tenantId}`);
+      console.log(`[addTenantClaim] Creating Firestore user document for ${userId} in tenant ${tenantId} with role ${role}`);
 
       // Create Firestore user document
       await db.collection("users").doc(userId).set({
@@ -399,17 +701,17 @@ export const addTenantClaim = beforeUserSignedIn(async (event): Promise<BeforeSi
         email: userEmail,
         display_name: displayName,
         tenant_id: tenantId,
-        role: role || "member",
+        role: role,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
         last_login_at: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Claims already set by setupNewUser, just return them
+      // Return the correct claims
       return {
         customClaims: {
           tenant_id: tenantId,
-          role: role || "member",
+          role: role,
         },
       };
     }

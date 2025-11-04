@@ -15,6 +15,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,8 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshToken = async () => {
+    try {
+      if (!auth.currentUser) {
+        console.warn("[AuthContext] No user to refresh token for");
+        return;
+      }
+      // Force refresh the ID token to get updated custom claims
+      const token = await auth.currentUser.getIdToken(true);
+      localStorage.setItem("firebase_token", token);
+      console.log("[AuthContext] Token refreshed successfully");
+    } catch (error) {
+      console.error("[AuthContext] Token refresh error:", error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );

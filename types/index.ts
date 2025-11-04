@@ -315,4 +315,12 @@ export interface Invitation {
   expires_at?: string;
   accepted_at?: string;
   accepted_by_user_id?: string;
+  cancelled_at?: string;
+  cancelled_by?: string;
+  last_email_attempt_at?: string;
+  last_email_sent_at?: string;
+  last_email_error?: string;
+  send_count?: number;
+  resend_parent_id?: string;
+  resend_requested_at?: string;
 }

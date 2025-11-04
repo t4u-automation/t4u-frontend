@@ -25,7 +25,7 @@ import CreateRunModal from "@/components/CreateRunModal";
 import EditRunModal from "@/components/EditRunModal";
 import { useToast } from "@/contexts/ToastContext";
 import { executeRun } from "@/lib/api";
-import { Feature, Story, TestCase, TestCaseStatus, T4UUser, Project, TestPlan, Run } from "@/types";
+import { Feature, Story, TestCase, TestCaseStatus, T4UUser, Project, TestPlan, Run, Invitation } from "@/types";
 import {
   getProjectFeatures,
   getFeatureStories,
@@ -60,6 +60,12 @@ import {
   createRun,
   updateRun,
   deleteRun,
+  getTenantUsers,
+  getTenantInvitations,
+  createInvitation,
+  cancelInvitation,
+  resendInvitation,
+  removeUserFromTenant,
 } from "@/lib/t4u";
 
 interface ProjectDetailsContentProps {
@@ -78,9 +84,13 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [statuses, setStatuses] = useState<TestCaseStatus[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [members, setMembers] = useState<T4UUser[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  const [userRole, setUserRole] = useState<T4UUser["role"] | null>(null);
   const tabParam = searchParams.get('tab') as "test-cases" | "test-plans" | "runs" | "settings" | null;
   const testCaseIdParam = searchParams.get('testCaseId') as string | null;
   const [activeMenuItem, setActiveMenuItem] = useState<"test-cases" | "test-plans" | "runs" | "settings">(
@@ -90,7 +100,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const [selectedTestPlanId, setSelectedTestPlanId] = useState<string | null>(null);
   const runIdParam = searchParams.get('runId') as string | null;
   const testPlanIdParam = searchParams.get('testPlanId') as string | null;
-  const settingsTabParam = searchParams.get('settingsTab') as "general" | "statuses" | null;
+  const settingsTabParam = searchParams.get('settingsTab') as "general" | "team" | "statuses" | null;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [showCreateTestPlanModal, setShowCreateTestPlanModal] = useState(false);
   const [showEditTestPlanModal, setShowEditTestPlanModal] = useState(false);
@@ -206,6 +216,36 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     }
   };
 
+  const loadTeamData = async (showSpinner: boolean = true) => {
+    if (!tenant) return;
+
+    try {
+      if (showSpinner) {
+        setTeamLoading(true);
+      }
+
+      const [tenantUsers, tenantInvitations] = await Promise.all([
+        getTenantUsers(tenant.id),
+        getTenantInvitations(tenant.id),
+      ]);
+
+      setMembers(tenantUsers);
+      setInvitations(tenantInvitations);
+    } catch (error) {
+      console.error("[ProjectDetailsContent] Error loading team data:", error);
+    } finally {
+      if (showSpinner) {
+        setTeamLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (tenant) {
+      void loadTeamData();
+    }
+  }, [tenant?.id]);
+
   // Real-time listener for runs
   useEffect(() => {
     if (!tenant) return;
@@ -300,6 +340,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       if (userDoc.exists()) {
         const userData = userDoc.data() as T4UUser;
         setIsOwner(userData.role === "owner");
+        setUserRole(userData.role);
       }
     } catch (error) {
       console.error("[ProjectDetailsContent] Error checking user role:", error);
@@ -355,6 +396,8 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
   const selectedStatus = selectedTestCase
     ? statuses.find((s) => s.id === selectedTestCase.status_id)
     : undefined;
+  const canManageTeam = userRole === "owner" || userRole === "admin";
+  const currentUserId = user?.uid ?? null;
 
   const handleUpdateTenant = async (name: string) => {
     if (!tenant) return;
@@ -393,6 +436,59 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
       console.log("[ProjectDetailsContent] Status updated:", statusId);
     } catch (error) {
       console.error("[ProjectDetailsContent] Error updating status:", error);
+      throw error;
+    }
+  };
+
+  const handleInviteMember = async (email: string, role: Invitation["role"]) => {
+    if (!tenant || !user) {
+      throw new Error("Unable to send invitation without tenant context");
+    }
+
+    try {
+      await createInvitation(tenant.id, user.uid, email, role);
+      await loadTeamData(false);
+    } catch (error) {
+      console.error("[ProjectDetailsContent] Error creating invitation:", error);
+      throw error;
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!user) {
+      throw new Error("Unable to cancel invitation without user context");
+    }
+
+    try {
+      await cancelInvitation(invitationId, user.uid);
+      await loadTeamData(false);
+    } catch (error) {
+      console.error("[ProjectDetailsContent] Error cancelling invitation:", error);
+      throw error;
+    }
+  };
+
+  const handleResendInvitation = async (invitationId: string) => {
+    if (!user) {
+      throw new Error("Unable to resend invitation without user context");
+    }
+
+    try {
+      await resendInvitation(invitationId, user.uid);
+      await loadTeamData(false);
+    } catch (error) {
+      console.error("[ProjectDetailsContent] Error resending invitation:", error);
+      throw error;
+    }
+  };
+
+  const handleRemoveUser = async (userId: string) => {
+    try {
+      await removeUserFromTenant(userId);
+      await loadTeamData(false);
+      showSuccess("User removed successfully");
+    } catch (error) {
+      console.error("[ProjectDetailsContent] Error removing user:", error);
       throw error;
     }
   };
@@ -590,7 +686,7 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
     router.push(`?tab=${item}`);
   };
 
-  const handleSettingsTabChange = (tab: "general" | "statuses") => {
+  const handleSettingsTabChange = (tab: "general" | "team" | "statuses") => {
     router.push(`?tab=settings&settingsTab=${tab}`);
   };
 
@@ -1122,10 +1218,19 @@ export default function ProjectDetailsContent({ projectId }: ProjectDetailsConte
           <TenantSettings
             tenant={tenant}
             statuses={statuses}
+            members={members}
+            invitations={invitations}
+            isTeamLoading={teamLoading}
             onUpdateTenant={handleUpdateTenant}
             onCreateStatus={handleCreateStatus}
             onUpdateStatus={handleUpdateStatus}
             onDeleteStatus={handleDeleteStatus}
+            onInviteMember={handleInviteMember}
+            onCancelInvitation={handleCancelInvitation}
+            onResendInvitation={handleResendInvitation}
+            onRemoveUser={handleRemoveUser}
+            canManageTeam={canManageTeam}
+            currentUserId={currentUserId}
             onSettingsTabChange={handleSettingsTabChange}
             activeSettingsTab={settingsTabParam || "general"}
           />

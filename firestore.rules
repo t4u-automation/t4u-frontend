@@ -6,22 +6,46 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    function userRole() {
+      return request.auth.token.role;
+    }
+
+    function userTenantId() {
+      return request.auth.token.tenant_id;
+    }
     
     // Helper function to check if user belongs to a specific tenant
-    // Validates tenant_id custom claim from ID token
     function belongsToTenant(tenantId) {
-      return isAuthenticated() && 
-             request.auth.token.tenant_id == tenantId;
+      return isAuthenticated() && userTenantId() == tenantId;
     }
-    
+
+    function hasTenantAdminAccess(tenantId) {
+      return belongsToTenant(tenantId) && userRole() in ["owner", "admin"];
+    }
+
     // Helper function to check if user is tenant owner
     function isTenantOwner(tenantId) {
-      // Check if user's tenant matches and fetch owner from tenant document
-      // For now, we rely on belongsToTenant for basic validation
-      return belongsToTenant(tenantId) && 
-             resource.data.owner_id == request.auth.uid;
+      return belongsToTenant(tenantId) && userRole() == "owner";
     }
     
+    // ==========================================
+    // Invitations
+    // ==========================================
+    match /invitations/{invitationId} {
+      // Users can read invitations for their tenant
+      allow read: if isAuthenticated() && 
+        belongsToTenant(resource.data.tenant_id);
+      
+      // Only admins and owners can create invitations for their tenant
+      allow create: if isAuthenticated() && 
+        hasTenantAdminAccess(request.resource.data.tenant_id);
+      
+      // Only admins and owners can update/cancel invitations for their tenant
+      allow update, delete: if isAuthenticated() && 
+        hasTenantAdminAccess(resource.data.tenant_id);
+    }
+
     // ==========================================
     // Tenants
     // ==========================================
@@ -56,8 +80,10 @@ service cloud.firestore {
       // Users can update their own document
       allow update: if isAuthenticated() && request.auth.uid == userId;
       
-      // Only tenant owners can delete users
-      allow delete: if isAuthenticated() && isTenantOwner(resource.data.tenant_id);
+      // Owners and admins can delete users (with restrictions enforced in trigger)
+      allow delete: if isAuthenticated() && 
+        hasTenantAdminAccess(resource.data.tenant_id) &&
+        request.auth.uid != userId;  // Cannot delete yourself
     }
     
     // ==========================================
