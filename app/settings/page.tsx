@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Header from "@/components/Header";
@@ -24,7 +24,7 @@ import {
 import { updateTenant } from "@/lib/firestore/tenants";
 import { Settings } from "lucide-react";
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { tenant, loading: tenantLoading, needsOnboarding } = useTenant(user);
   const router = useRouter();
@@ -298,6 +298,18 @@ export default function SettingsPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen bg-[var(--background-gray-main)]">
+        <div className="text-[var(--text-tertiary)]">Loading...</div>
+      </div>
+    }>
+      <SettingsPageContent />
+    </Suspense>
   );
 }
 
