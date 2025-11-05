@@ -582,7 +582,7 @@ export const deleteUserFromAuth = functions.firestore
 // @ts-expect-error - Firebase types are incorrectly defined, this is the correct usage per docs
 export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreateResponse | void> => {
   const userEmail = event.data.email;
-  const displayName = event.data.displayName || "User";
+  const displayName = event.data.displayName || userEmail || "User";
   const userId = event.data.uid;
 
   console.log(`[setupNewUser] Processing new user: ${userEmail}`);
@@ -652,7 +652,7 @@ export const setupNewUser = beforeUserCreated(async (event): Promise<BeforeCreat
 export const addTenantClaim = beforeUserSignedIn(async (event): Promise<BeforeSignInResponse | void> => {
   const userId = event.data.uid;
   const userEmail = event.data.email;
-  const displayName = event.data.displayName;
+  const displayName = event.data.displayName || userEmail || "User";
 
   console.log(`[addTenantClaim] Processing sign-in for user: ${userEmail}`);
 

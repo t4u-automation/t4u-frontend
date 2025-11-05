@@ -5,9 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function LoginPage() {
-  const { user, signInWithGoogle, signInWithGithub, loading } = useAuth();
+  const { user, signInWithGoogle, signInWithGithub, signUpWithEmail, signInWithEmail, loading } = useAuth();
   const router = useRouter();
   const [signingInWith, setSigningInWith] = useState<string | null>(null);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -18,9 +23,11 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       setSigningInWith("google");
+      setError("");
       await signInWithGoogle();
     } catch (error) {
       console.error("Google sign in failed:", error);
+      setError("Google sign in failed. Please try again.");
       setSigningInWith(null);
     }
   };
@@ -28,9 +35,58 @@ export default function LoginPage() {
   const handleGithubSignIn = async () => {
     try {
       setSigningInWith("github");
+      setError("");
       await signInWithGithub();
     } catch (error) {
       console.error("GitHub sign in failed:", error);
+      setError("GitHub sign in failed. Please try again.");
+      setSigningInWith(null);
+    }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (isSignUp) {
+      if (password !== confirmPassword) {
+        setError("Passwords do not match");
+        return;
+      }
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters");
+        return;
+      }
+    }
+
+    try {
+      setSigningInWith("email");
+      if (isSignUp) {
+        await signUpWithEmail(email, password);
+      } else {
+        await signInWithEmail(email, password);
+      }
+    } catch (error: any) {
+      console.error("Email auth failed:", error);
+      // Map Firebase error codes to user-friendly messages
+      if (error.code === "auth/email-already-in-use") {
+        setError("Email is already in use");
+      } else if (error.code === "auth/weak-password") {
+        setError("Password is too weak (min 6 characters)");
+      } else if (error.code === "auth/invalid-email") {
+        setError("Invalid email address");
+      } else if (error.code === "auth/user-not-found") {
+        setError("User not found");
+      } else if (error.code === "auth/wrong-password") {
+        setError("Incorrect password");
+      } else {
+        setError(error.message || "Authentication failed. Please try again.");
+      }
       setSigningInWith(null);
     }
   };
@@ -59,6 +115,107 @@ export default function LoginPage() {
 
           {/* Login Card */}
           <div className="bg-white rounded-[16px] shadow-[0px_8px_24px_0px_rgba(0,0,0,0.08)] border border-[var(--border-main)] p-8">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-[8px] text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Email/Password Form */}
+            <form onSubmit={handleEmailSubmit} className="mb-6">
+              <div className="flex flex-col gap-4">
+                {/* Email Input */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={signingInWith !== null}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-2 border border-[var(--border-main)] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                </div>
+
+                {/* Password Input */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={signingInWith !== null}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2 border border-[var(--border-main)] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                </div>
+
+                {/* Confirm Password Input (Sign Up Only) */}
+                {isSignUp && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={signingInWith !== null}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-2 border border-[var(--border-main)] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={signingInWith !== null}
+                  className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium text-base rounded-[10px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {signingInWith === "email"
+                    ? isSignUp
+                      ? "Creating Account..."
+                      : "Signing In..."
+                    : isSignUp
+                    ? "Create Account"
+                    : "Sign In"}
+                </button>
+
+                {/* Toggle Sign Up / Sign In */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setError("");
+                    setEmail("");
+                    setPassword("");
+                    setConfirmPassword("");
+                  }}
+                  disabled={signingInWith !== null}
+                  className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                >
+                  {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Create one"}
+                </button>
+              </div>
+            </form>
+
+            {/* Divider */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[var(--border-main)]"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-[var(--text-tertiary)]">Or continue with</span>
+              </div>
+            </div>
+
+            {/* OAuth Buttons */}
             <div className="flex flex-col gap-3">
               {/* Google Sign In Button */}
               <button
