@@ -17,6 +17,46 @@ interface HeaderProps {
   userRole?: string | null;
 }
 
+// Helper function to get initials from email or display name
+function getInitials(displayName?: string | null, email?: string | null): string {
+  if (displayName && displayName.trim()) {
+    return displayName
+      .split(" ")
+      .map((name) => name[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }
+  if (email) {
+    return email[0].toUpperCase();
+  }
+  return "U";
+}
+
+// Helper function to generate a consistent color based on email
+function getAvatarColor(email?: string | null): string {
+  if (!email) return "#3B82F6"; // default blue
+  
+  const colors = [
+    "#3B82F6", // blue
+    "#10B981", // emerald
+    "#F59E0B", // amber
+    "#EF4444", // red
+    "#8B5CF6", // violet
+    "#EC4899", // pink
+    "#14B8A6", // teal
+    "#6366F1", // indigo
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    hash = ((hash << 5) - hash) + email.charCodeAt(i);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  return colors[Math.abs(hash) % colors.length];
+}
+
 export default function Header({
   showVNCButton = false,
   onVNCClick,
@@ -27,6 +67,7 @@ export default function Header({
   showSettingsButton = false,
   userRole = null,
 }: HeaderProps) {
+  
   const { user, logout } = useAuth();
   const router = useRouter();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -40,6 +81,9 @@ export default function Header({
   const handleLogoClick = () => {
     router.push("/projects");
   };
+
+  const initials = getInitials(user?.displayName, user?.email);
+  const avatarColor = getAvatarColor(user?.email);
 
   return (
     <div
@@ -124,18 +168,26 @@ export default function Header({
                 <div className="relative flex items-center justify-center font-bold cursor-pointer flex-shrink-0">
                   <div
                     className="relative flex items-center justify-center font-bold flex-shrink-0 rounded-full overflow-hidden"
-                    style={{ width: "32px", height: "32px" }}
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      backgroundColor: user.photoURL ? "transparent" : avatarColor,
+                    }}
                   >
-                    <Image
-                      className="w-full h-full object-cover overflow-hidden"
-                      src={
-                        user.photoURL || "https://via.placeholder.com/32?text=U"
-                      }
-                      alt={user.displayName || "User"}
-                      width={32}
-                      height={32}
-                      unoptimized={!user.photoURL}
-                    />
+                    {user.photoURL ? (
+                      <Image
+                        className="w-full h-full object-cover"
+                        src={user.photoURL}
+                        alt={user.displayName || "User"}
+                        width={32}
+                        height={32}
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-white text-sm font-bold">
+                        {initials}
+                      </span>
+                    )}
                   </div>
                   <Image
                     className="absolute bottom-[-2px] right-[-2px] w-[12px] h-[12px]"
@@ -159,23 +211,30 @@ export default function Header({
                     <div className="flex items-center gap-3 pb-3 border-b border-[var(--border-main)]">
                       <div
                         className="relative flex items-center justify-center flex-shrink-0 rounded-full overflow-hidden"
-                        style={{ width: "48px", height: "48px" }}
+                        style={{
+                          width: "48px",
+                          height: "48px",
+                          backgroundColor: user.photoURL ? "transparent" : avatarColor,
+                        }}
                       >
-                        <Image
-                          className="w-full h-full object-cover"
-                          src={
-                            user.photoURL ||
-                            "https://via.placeholder.com/48?text=U"
-                          }
-                          alt={user.displayName || "User"}
-                          width={48}
-                          height={48}
-                          unoptimized={!user.photoURL}
-                        />
+                        {user.photoURL ? (
+                          <Image
+                            className="w-full h-full object-cover"
+                            src={user.photoURL}
+                            alt={user.displayName || "User"}
+                            width={48}
+                            height={48}
+                            unoptimized
+                          />
+                        ) : (
+                          <span className="text-white text-xl font-bold">
+                            {initials}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="text-[var(--text-primary)] font-semibold text-base truncate">
-                          {user.displayName || "User"}
+                          {user.displayName || user.email}
                         </span>
                         <span className="text-[var(--text-tertiary)] text-sm truncate">
                           {user.email}
