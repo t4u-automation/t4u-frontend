@@ -194,6 +194,49 @@ export async function clearTestCaseProvenSteps(testCaseId: string): Promise<void
 }
 
 /**
+ * Delete a specific proven step from a test case
+ */
+export async function deleteTestCaseProvenStep(
+  testCaseId: string,
+  stepNumber: number
+): Promise<void> {
+  try {
+    // Get the current test case
+    const testCase = await getTestCaseById(testCaseId);
+    if (!testCase || !testCase.proven_steps) {
+      throw new Error("Test case or proven steps not found");
+    }
+
+    // Filter out the step with the specified step_number
+    const updatedSteps = testCase.proven_steps.filter(
+      (step) => step.step_number !== stepNumber
+    );
+
+    // Renumber the remaining steps to maintain sequential order
+    const renumberedSteps = updatedSteps.map((step, index) => ({
+      ...step,
+      step_number: index + 1,
+    }));
+
+    // Update the test case with the new steps
+    const testCaseRef = doc(db, "test_cases", testCaseId);
+    await setDoc(
+      testCaseRef,
+      {
+        proven_steps: renumberedSteps,
+        proven_steps_count: renumberedSteps.length,
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    console.log("[T4U] Proven step deleted from test case:", testCaseId, "step:", stepNumber);
+  } catch (error) {
+    console.error("[T4U] Error deleting proven step:", error);
+    throw error;
+  }
+}
+
+/**
  * Clone a test case (creates duplicate in the same story)
  */
 export async function cloneTestCase(

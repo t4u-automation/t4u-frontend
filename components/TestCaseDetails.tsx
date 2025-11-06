@@ -71,6 +71,8 @@ export default function TestCaseDetails({
   const [editingCommentContent, setEditingCommentContent] = useState("");
   const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
   const [showDeleteCommentConfirm, setShowDeleteCommentConfirm] = useState(false);
+  const [deleteStepNumber, setDeleteStepNumber] = useState<number | null>(null);
+  const [showDeleteStepConfirm, setShowDeleteStepConfirm] = useState(false);
 
   // Fetch latest agent session for this test case
   const {
@@ -324,6 +326,26 @@ export default function TestCaseDetails({
       console.error("[TestCaseDetails] Error saving shared test cases:", error);
       showError("Failed to save shared test cases");
       throw error;
+    }
+  };
+
+  const handleDeleteStep = (stepNumber: number) => {
+    setDeleteStepNumber(stepNumber);
+    setShowDeleteStepConfirm(true);
+  };
+
+  const handleConfirmDeleteStep = async () => {
+    if (deleteStepNumber === null) return;
+    try {
+      const { deleteTestCaseProvenStep } = await import("@/lib/firestore/testCases");
+      await deleteTestCaseProvenStep(testCase.id, deleteStepNumber);
+      showSuccess("Step deleted");
+    } catch (error) {
+      console.error("[TestCaseDetails] Error deleting step:", error);
+      showError("Failed to delete step");
+    } finally {
+      setDeleteStepNumber(null);
+      setShowDeleteStepConfirm(false);
     }
   };
 
@@ -878,6 +900,21 @@ export default function TestCaseDetails({
           isDanger={true}
         />
 
+        {/* Confirm Delete Step Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteStepConfirm}
+          title="Delete automated step?"
+          message="Are you sure you want to delete this step? The remaining steps will be renumbered. This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleConfirmDeleteStep}
+          onCancel={() => {
+            setShowDeleteStepConfirm(false);
+            setDeleteStepNumber(null);
+          }}
+          isDanger={true}
+        />
+
         {/* Automated Steps Tab */}
         {currentTab === "automated-steps" && (
           provenSteps && provenSteps.length > 0 ? (
@@ -897,7 +934,7 @@ export default function TestCaseDetails({
                   {provenSteps.map((step) => (
                     <div
                       key={step.step_number}
-                      className="flex gap-3 p-4 bg-white border border-[var(--border-main)] rounded-[8px] hover:border-[var(--border-input-active)] transition-colors"
+                      className="flex gap-3 p-4 bg-white border border-[var(--border-main)] rounded-[8px] hover:border-[var(--border-input-active)] transition-colors group"
                     >
                       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--fill-tsp-gray-main)] flex items-center justify-center">
                         <span className="text-sm font-semibold text-[var(--text-primary)]">
@@ -912,6 +949,13 @@ export default function TestCaseDetails({
                           {renderStepArguments(step)}
                         </div>
                       </div>
+                      <button
+                        onClick={() => handleDeleteStep(step.step_number)}
+                        className="flex-shrink-0 p-2 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete step"
+                      >
+                        <Trash2 size={16} className="text-red-500" />
+                      </button>
                     </div>
                   ))}
                 </div>
