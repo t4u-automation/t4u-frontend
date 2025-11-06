@@ -270,6 +270,28 @@ export async function resumeAgent(sessionId: string): Promise<void> {
   }
 }
 
+export async function cancelAgent(sessionId: string): Promise<void> {
+  const url = `${env.apiUrl}/agent/cancel/${sessionId}`;
+
+  try {
+    const response = await apiCall(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    console.log("[API] Agent cancelled successfully");
+  } catch (error) {
+    console.error("[API] Cancel error:", error);
+    throw error;
+  }
+}
+
 export async function executeRun(
   runId: string,
   tenantId: string,

@@ -147,6 +147,7 @@ export default function MessageItem({ message }: MessageItemProps) {
                         (() => {
                           // Render terminate tool specially - skip if there's a plan
                           const hasPlan = message.toolCalls?.some((t) => t.toolName === "planning");
+                          const isCancelled = tool.terminateData.status === "cancelled";
                           
                           // If there's a plan, the terminate info will be shown in the plan card
                           if (hasPlan) {
@@ -163,6 +164,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                                 className={`p-4 rounded-[12px] border shadow-sm ${
                                   tool.terminateData.status === "success"
                                     ? "border-green-200 bg-green-50"
+                                    : isCancelled
+                                    ? "border-yellow-200 bg-yellow-50"
                                     : "border-red-200 bg-red-50"
                                 }`}
                               >
@@ -172,6 +175,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                                     className={`w-5 h-5 flex items-center justify-center rounded-full ${
                                       tool.terminateData.status === "success"
                                         ? "bg-green-500"
+                                        : isCancelled
+                                        ? "bg-yellow-500"
                                         : "bg-red-500"
                                     }`}
                                   >
@@ -185,10 +190,12 @@ export default function MessageItem({ message }: MessageItemProps) {
                                     className={`font-semibold ${
                                       tool.terminateData.status === "success"
                                         ? "text-green-700"
+                                        : isCancelled
+                                        ? "text-yellow-700"
                                         : "text-red-700"
                                     }`}
                                   >
-                                    Session {tool.terminateData.status === "success" ? "Completed" : "Failed"}
+                                    Session {tool.terminateData.status === "success" ? "Completed" : isCancelled ? "Cancelled" : "Failed"}
                                   </h3>
                                 </div>
 
@@ -197,6 +204,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                                   className={`text-sm ${
                                     tool.terminateData.status === "success"
                                       ? "text-green-600"
+                                      : isCancelled
+                                      ? "text-yellow-600"
                                       : "text-red-600"
                                   }`}
                                 >
@@ -216,6 +225,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                         terminateTool?.terminateData
                           ? terminateTool.terminateData.status === "success"
                             ? "border-green-200 bg-green-50"
+                            : terminateTool.terminateData.status === "cancelled"
+                            ? "border-yellow-200 bg-yellow-50"
                             : "border-red-200 bg-red-50"
                           : "border-[var(--border-light)] bg-[var(--fill-white)]"
                       }`}>
@@ -227,6 +238,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                               if (terminateTool?.terminateData) {
                                 return terminateTool.terminateData.status === "success"
                                   ? "bg-green-500"
+                                  : terminateTool.terminateData.status === "cancelled"
+                                  ? "bg-yellow-500"
                                   : "bg-red-500";
                               }
                               
@@ -306,6 +319,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                             terminateTool?.terminateData
                               ? terminateTool.terminateData.status === "success"
                                 ? "text-green-700"
+                                : terminateTool.terminateData.status === "cancelled"
+                                ? "text-yellow-700"
                                 : "text-red-700"
                               : "text-[var(--text-primary)]"
                           }`}>
@@ -315,9 +330,11 @@ export default function MessageItem({ message }: MessageItemProps) {
                             <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                               terminateTool.terminateData.status === "success"
                                 ? "bg-green-200 text-green-700"
+                                : terminateTool.terminateData.status === "cancelled"
+                                ? "bg-yellow-200 text-yellow-700"
                                 : "bg-red-200 text-red-700"
                             }`}>
-                              {terminateTool.terminateData.status === "success" ? "Completed" : "Failed"}
+                              {terminateTool.terminateData.status === "success" ? "Completed" : terminateTool.terminateData.status === "cancelled" ? "Cancelled" : "Failed"}
                             </span>
                           )}
                         </div>
@@ -329,6 +346,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                               terminateTool?.terminateData
                                 ? terminateTool.terminateData.status === "success"
                                   ? "text-green-600"
+                                  : terminateTool.terminateData.status === "cancelled"
+                                  ? "text-yellow-600"
                                   : "text-red-600"
                                 : "text-[var(--text-secondary)]"
                             }`}>
@@ -339,6 +358,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                               terminateTool?.terminateData
                                 ? terminateTool.terminateData.status === "success"
                                   ? "text-green-700"
+                                  : terminateTool.terminateData.status === "cancelled"
+                                  ? "text-yellow-700"
                                   : "text-red-700"
                                 : "text-[var(--text-primary)]"
                             }`}>
@@ -351,6 +372,8 @@ export default function MessageItem({ message }: MessageItemProps) {
                                 terminateTool?.terminateData
                                   ? terminateTool.terminateData.status === "success"
                                     ? "bg-green-500"
+                                    : terminateTool.terminateData.status === "cancelled"
+                                    ? "bg-yellow-500"
                                     : "bg-red-500"
                                   : "bg-blue-500"
                               }`}
@@ -363,48 +386,58 @@ export default function MessageItem({ message }: MessageItemProps) {
 
                         {/* Plan Steps */}
                         <div className="space-y-2">
-                          {tool.planData.steps.map((step) => (
-                            <div
-                              key={step.index}
-                              className="flex items-start gap-2 text-sm"
-                            >
-                              {/* Step Status Icon */}
-                              {step.status === "completed" ? (
-                                <CheckCircle
-                                  size={16}
-                                  className="text-green-500 mt-0.5 flex-shrink-0"
-                                />
-                              ) : step.status === "in_progress" ? (
-                                <Loader2
-                                  size={16}
-                                  className="text-blue-500 mt-0.5 flex-shrink-0 animate-spin"
-                                />
-                              ) : step.status === "blocked" ? (
-                                <Circle
-                                  size={16}
-                                  className="text-red-500 mt-0.5 flex-shrink-0"
-                                />
-                              ) : (
-                                <Circle
-                                  size={16}
-                                  className="text-gray-300 mt-0.5 flex-shrink-0"
-                                />
-                              )}
-
-                              {/* Step Text */}
-                              <span
-                                className={`flex-1 ${
-                                  step.status === "completed"
-                                    ? "text-[var(--text-tertiary)] line-through"
-                                    : step.status === "in_progress"
-                                    ? "text-[var(--text-primary)] font-medium"
-                                    : "text-[var(--text-secondary)]"
-                                }`}
+                          {tool.planData.steps.map((step) => {
+                            // If session is cancelled, treat in_progress steps as blocked
+                            const isCancelled = terminateTool?.terminateData?.status === "cancelled";
+                            const effectiveStatus = (isCancelled && step.status === "in_progress") 
+                              ? "blocked" 
+                              : step.status;
+                            
+                            return (
+                              <div
+                                key={step.index}
+                                className="flex items-start gap-2 text-sm"
                               >
-                                {step.title}
-                              </span>
-                            </div>
-                          ))}
+                                {/* Step Status Icon */}
+                                {effectiveStatus === "completed" ? (
+                                  <CheckCircle
+                                    size={16}
+                                    className="text-green-500 mt-0.5 flex-shrink-0"
+                                  />
+                                ) : effectiveStatus === "in_progress" ? (
+                                  <Loader2
+                                    size={16}
+                                    className="text-blue-500 mt-0.5 flex-shrink-0 animate-spin"
+                                  />
+                                ) : effectiveStatus === "blocked" ? (
+                                  <Circle
+                                    size={16}
+                                    className={`mt-0.5 flex-shrink-0 ${
+                                      isCancelled ? "text-yellow-500" : "text-red-500"
+                                    }`}
+                                  />
+                                ) : (
+                                  <Circle
+                                    size={16}
+                                    className="text-gray-300 mt-0.5 flex-shrink-0"
+                                  />
+                                )}
+
+                                {/* Step Text */}
+                                <span
+                                  className={`flex-1 ${
+                                    effectiveStatus === "completed"
+                                      ? "text-[var(--text-tertiary)] line-through"
+                                      : effectiveStatus === "in_progress"
+                                      ? "text-[var(--text-primary)] font-medium"
+                                      : "text-[var(--text-secondary)]"
+                                  }`}
+                                >
+                                  {step.title}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
 
                         {/* Termination Message (if session terminated) */}
@@ -412,11 +445,15 @@ export default function MessageItem({ message }: MessageItemProps) {
                           <div className={`mt-3 pt-3 border-t ${
                             terminateTool.terminateData.status === "success"
                               ? "border-green-200"
+                              : terminateTool.terminateData.status === "cancelled"
+                              ? "border-yellow-200"
                               : "border-red-200"
                           }`}>
                             <p className={`text-sm ${
                               terminateTool.terminateData.status === "success"
                                 ? "text-green-600"
+                                : terminateTool.terminateData.status === "cancelled"
+                                ? "text-yellow-600"
                                 : "text-red-600"
                             }`}>
                               {terminateTool.terminateData.output}

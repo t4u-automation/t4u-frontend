@@ -263,6 +263,21 @@ function convertStepsToToolCalls(steps: AgentStep[]): {
       continue;
     }
 
+    if (step.event_type === "session_cancelled") {
+      toolCalls.push({
+        toolName: "terminate",
+        action: "Session Cancelled",
+        details: "cancelled",
+        status: "completed",
+        agentName: step.agent_name,
+        terminateData: {
+          status: "cancelled",
+          output: step.thinking || "Session cancelled by user",
+        },
+      });
+      continue;
+    }
+
     if (step.tool_calls && step.tool_calls.length > 0) {
       // Process each tool call in the array
       for (let i = 0; i < step.tool_calls.length; i++) {

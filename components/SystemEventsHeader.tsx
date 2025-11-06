@@ -10,6 +10,7 @@ interface SystemEventsHeaderProps {
   isSessionActive?: boolean;
   onScrollToMessage: () => void;
   onRun?: () => Promise<void>;
+  onCancel?: (sessionId: string) => Promise<void>;
 }
 
 export default function SystemEventsHeader({
@@ -18,8 +19,10 @@ export default function SystemEventsHeader({
   isSessionActive = false,
   onScrollToMessage,
   onRun,
+  onCancel,
 }: SystemEventsHeaderProps) {
   const [isRunning, setIsRunning] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Show if there's an AI message with planning data (main task)
   const planningTool = message?.toolCalls?.find(
@@ -41,6 +44,18 @@ export default function SystemEventsHeader({
     }
   };
 
+  const handleCancel = async () => {
+    if (!onCancel || !sessionId) return;
+    try {
+      setIsCancelling(true);
+      await onCancel(sessionId);
+    } catch (error) {
+      console.error("[SystemEventsHeader] Error cancelling:", error);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   // Don't show anything if no session and no plan
   if (!isSessionActive && !planningTool) return null;
 
@@ -56,6 +71,31 @@ export default function SystemEventsHeader({
             <div className="h-4 bg-gray-200 rounded animate-pulse w-48" />
           </div>
           <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
+          
+          {/* Cancel Button - Show in skeleton state when session is active */}
+          {onCancel && sessionId && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCancel();
+              }}
+              disabled={isCancelling}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex-shrink-0 text-sm font-medium"
+              title="Cancel execution"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Cancelling...</span>
+                </>
+              ) : (
+                <>
+                  <X size={14} />
+                  <span>Cancel</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -92,6 +132,7 @@ export default function SystemEventsHeader({
   // Priority: terminated > blocked > in_progress > not_started > completed
   const isTerminated = !!terminateTool?.terminateData;
   const terminateStatus = terminateTool?.terminateData?.status;
+  const isCancelled = terminateStatus === "cancelled";
   const isCompleted = isTerminated
     ? terminateStatus === "success"
     : sandboxReady && allStepsCompleted && !hasBlockedSteps;
@@ -111,6 +152,8 @@ export default function SystemEventsHeader({
           isTerminated
             ? terminateStatus === "success"
               ? "bg-green-50 border-green-200"
+              : isCancelled
+              ? "bg-yellow-50 border-yellow-200"
               : "bg-red-50 border-red-200"
             : "bg-[var(--fill-white)] border-[var(--border-light)]"
         }`}
@@ -119,6 +162,8 @@ export default function SystemEventsHeader({
           className={`w-5 h-5 flex items-center justify-center rounded-full flex-shrink-0 ${
             isCompleted
               ? "bg-green-500"
+              : isCancelled
+              ? "bg-yellow-500"
               : isBlocked
               ? "bg-red-500"
               : isInProgress
@@ -128,6 +173,8 @@ export default function SystemEventsHeader({
         >
           {isCompleted ? (
             <Check size={12} className="text-white" />
+          ) : isCancelled ? (
+            <X size={12} className="text-white" />
           ) : isBlocked ? (
             <X size={12} className="text-white" />
           ) : isInProgress ? (
@@ -141,6 +188,8 @@ export default function SystemEventsHeader({
             isTerminated
               ? terminateStatus === "success"
                 ? "text-green-700"
+                : isCancelled
+                ? "text-yellow-700"
                 : "text-red-700"
               : "text-[var(--text-primary)]"
           }`}
@@ -152,10 +201,12 @@ export default function SystemEventsHeader({
             className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
               terminateStatus === "success"
                 ? "bg-green-200 text-green-700"
+                : isCancelled
+                ? "bg-yellow-200 text-yellow-700"
                 : "bg-red-200 text-red-700"
             }`}
           >
-            {terminateStatus === "success" ? "Completed" : "Failed"}
+            {terminateStatus === "success" ? "Completed" : isCancelled ? "Cancelled" : "Failed"}
           </span>
         )}
         <span
@@ -163,6 +214,8 @@ export default function SystemEventsHeader({
             isTerminated
               ? terminateStatus === "success"
                 ? "text-green-600"
+                : isCancelled
+                ? "text-yellow-600"
                 : "text-red-600"
               : "text-[var(--text-tertiary)]"
           }`}
@@ -171,7 +224,32 @@ export default function SystemEventsHeader({
           {planningTool.planData.progress.total} steps
         </span>
 
-        {/* Run/Replay Button */}
+        {/* Cancel Button - Show when session is active */}
+        {!isTerminated && isSessionActive && onCancel && sessionId && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCancel();
+            }}
+            disabled={isCancelling}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex-shrink-0 text-sm font-medium"
+            title="Cancel execution"
+          >
+            {isCancelling ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Cancelling...</span>
+              </>
+            ) : (
+              <>
+                <X size={14} />
+                <span>Cancel</span>
+              </>
+            )}
+          </button>
+        )}
+
+        {/* Run/Replay Button - Show when session is terminated */}
         {isTerminated && onRun && (
           <button
             onClick={(e) => {

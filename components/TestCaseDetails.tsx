@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import StatusDropdown from "./StatusDropdown";
 import ConfirmDialog from "./ConfirmDialog";
 import { useTestCaseSession } from "@/hooks/useTestCaseSession";
-import { startAgent, pauseAgent, resumeAgent } from "@/lib/api";
+import { startAgent, pauseAgent, resumeAgent, cancelAgent } from "@/lib/api";
 import MessageItem from "./MessageItem";
 import FloatingVNC from "./FloatingVNC";
 import SystemEventsHeader from "./SystemEventsHeader";
@@ -236,6 +236,16 @@ export default function TestCaseDetails({
     } catch (error) {
       console.error("[TestCaseDetails] Error resuming agent:", error);
       showError("Failed to resume agent");
+    }
+  };
+
+  const handleCancelAgent = async (sessionId: string) => {
+    try {
+      await cancelAgent(sessionId);
+      showSuccess("Agent cancelled");
+    } catch (error) {
+      console.error("[TestCaseDetails] Error cancelling agent:", error);
+      showError("Failed to cancel agent");
     }
   };
 
@@ -1002,6 +1012,7 @@ export default function TestCaseDetails({
                     isSessionActive={latestSession.status !== "completed" && latestSession.status !== "error"}
                     onScrollToMessage={() => {}}
                     onRun={handleRunWithAgent}
+                    onCancel={handleCancelAgent}
                   />
                 </div>
 
