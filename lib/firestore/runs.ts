@@ -75,16 +75,22 @@ export async function createRun(
     const runRef = doc(collection(db, "runs"));
     const now = new Date().toISOString();
     
-    // Initialize results for each test case
+    // Import the function to get total steps
+    const { getTestCaseTotalSteps } = await import("./testCases");
+    
+    // Initialize results for each test case with calculated total steps
     const results: { [testCaseId: string]: RunTestCaseResult } = {};
-    testCaseIds.forEach((tcId) => {
+    
+    // Calculate total steps for each test case (including shared test cases)
+    for (const tcId of testCaseIds) {
+      const totalSteps = await getTestCaseTotalSteps(tcId);
       results[tcId] = {
         test_case_id: tcId,
         status: "pending",
         current_step: 0,
-        total_steps: 0,
+        total_steps: totalSteps,
       };
-    });
+    }
     
     const run: Run = {
       id: runRef.id,

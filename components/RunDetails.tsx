@@ -182,7 +182,7 @@ export default function RunDetails({ run, testCases, onRerun, isExecuting }: Run
               const testCase = testCases.find(tc => tc.id === testCaseId);
               const result = liveRun.results[testCaseId];
               const isExpanded = expandedTestCases.has(testCaseId);
-              const provenSteps = testCase?.proven_steps || [];
+              const executionPlan = result?.execution_plan;
 
               if (!testCase || !result) return null;
 
@@ -210,13 +210,29 @@ export default function RunDetails({ run, testCases, onRerun, isExecuting }: Run
                       <div className="text-sm font-medium text-[var(--text-primary)] mb-1">
                         {index + 1}. {testCase.name}
                       </div>
-                      {result.status === "running" && result.total_steps > 0 && (
-                        <div className="text-xs text-[var(--text-tertiary)]">
-                          Step {result.current_step}/{result.total_steps}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-3 text-xs">
+                        {result.status === "running" && result.total_steps > 0 && (
+                          <span className="text-[var(--text-tertiary)]">
+                            Step {result.current_step}/{result.total_steps}
+                          </span>
+                        )}
+                        {(result.status === "passed" || result.status === "failed") && (
+                          <>
+                            {result.passed_steps !== undefined && (
+                              <span className="text-green-600">
+                                ✓ {result.passed_steps} passed
+                              </span>
+                            )}
+                            {result.failed_steps !== undefined && result.failed_steps > 0 && (
+                              <span className="text-red-600">
+                                ✗ {result.failed_steps} failed
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                       {result.error && (
-                        <div className="text-xs text-red-600 mt-1">
+                        <div className="text-xs text-red-600 mt-1 line-clamp-2">
                           {result.error}
                         </div>
                       )}
@@ -240,56 +256,166 @@ export default function RunDetails({ run, testCases, onRerun, isExecuting }: Run
                     )}
                   </div>
 
-                  {/* Proven Steps - Expanded View */}
-                  {isExpanded && provenSteps.length > 0 && (
+                  {/* Execution Plan - Expanded View */}
+                  {isExpanded && executionPlan && (
                     <div className="border-t border-[var(--border-light)] bg-[var(--fill-tsp-white-light)] p-4">
-                      <div className="space-y-2">
-                        {provenSteps.map((step, stepIndex) => {
-                          const isCompleted = stepIndex < result.current_step;
-                          const isCurrent = stepIndex === result.current_step - 1;
-                          
-                          return (
+                      <div className="space-y-4">
+                        {/* Before Test Cases */}
+                        {executionPlan.before && executionPlan.before.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-[var(--text-tertiary)] uppercase mb-2">
+                              Run Before
+                            </div>
+                            <div className="space-y-2">
+                              {executionPlan.before.map((beforeStep, idx) => {
+                                const [rangeStart, rangeEnd] = beforeStep.step_range;
+                                const isInRange = result.current_step >= rangeStart && result.current_step <= rangeEnd;
+                                const isCompleted = result.current_step > rangeEnd || (result.current_step >= rangeEnd && result.status === "passed");
+                                const hasFailed = result.status === "failed" && isInRange;
+                                
+                                return (
+                                  <div
+                                    key={`before-${idx}`}
+                                    className={`p-3 rounded-[6px] border ${
+                                      hasFailed ? "bg-red-50 border-red-200" :
+                                      isCompleted ? "bg-green-50 border-green-200" :
+                                      isInRange ? "bg-blue-50 border-blue-200" :
+                                      "bg-white border-[var(--border-light)]"
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                                        hasFailed ? "bg-red-500" :
+                                        isCompleted ? "bg-green-500" :
+                                        isInRange ? "bg-blue-500" :
+                                        "bg-gray-300"
+                                      }`}>
+                                        {hasFailed ? (
+                                          <XCircle size={12} className="text-white" />
+                                        ) : isCompleted ? (
+                                          <CheckCircle2 size={12} className="text-white" />
+                                        ) : (
+                                          <span className="text-[10px] font-semibold text-white">
+                                            {isInRange ? result.current_step : rangeStart}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-medium text-[var(--text-primary)]">
+                                          {beforeStep.name}
+                                        </div>
+                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                                          Steps {rangeStart}-{rangeEnd} • {beforeStep.steps} steps
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Main Test Case */}
+                        {executionPlan.main && (
+                          <div>
+                            <div className="text-xs font-semibold text-[var(--text-tertiary)] uppercase mb-2">
+                              Main Test Case
+                            </div>
                             <div
-                              key={step.step_number}
-                              className={`flex items-start gap-3 p-3 rounded-[6px] ${
-                                isCompleted ? "bg-green-50 border border-green-200" :
-                                isCurrent ? "bg-blue-50 border border-blue-200" :
-                                "bg-white border border-[var(--border-light)]"
+                              className={`p-3 rounded-[6px] border ${
+                                result.status === "failed" && result.current_step >= executionPlan.main.step_range[0] && result.current_step <= executionPlan.main.step_range[1] ? "bg-red-50 border-red-200" :
+                                (result.current_step > executionPlan.main.step_range[1] || (result.current_step >= executionPlan.main.step_range[1] && result.status === "passed")) ? "bg-green-50 border-green-200" :
+                                result.current_step >= executionPlan.main.step_range[0] && result.current_step <= executionPlan.main.step_range[1] ? "bg-blue-50 border-blue-200" :
+                                "bg-white border-[var(--border-light)]"
                               }`}
                             >
-                              <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                                isCompleted ? "bg-green-500" :
-                                isCurrent ? "bg-blue-500" :
-                                "bg-gray-300"
-                              }`}>
-                                {isCompleted ? (
-                                  <CheckCircle2 size={14} className="text-white" />
-                                ) : (
-                                  <span className="text-xs font-semibold text-white">
-                                    {step.step_number}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-[var(--text-primary)]">
-                                  {step.arguments.action.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                              <div className="flex items-start gap-2">
+                                <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                                  result.status === "failed" && result.current_step >= executionPlan.main.step_range[0] && result.current_step <= executionPlan.main.step_range[1] ? "bg-red-500" :
+                                  (result.current_step > executionPlan.main.step_range[1] || (result.current_step >= executionPlan.main.step_range[1] && result.status === "passed")) ? "bg-green-500" :
+                                  result.current_step >= executionPlan.main.step_range[0] ? "bg-blue-500" :
+                                  "bg-gray-300"
+                                }`}>
+                                  {result.status === "failed" && result.current_step >= executionPlan.main.step_range[0] && result.current_step <= executionPlan.main.step_range[1] ? (
+                                    <XCircle size={12} className="text-white" />
+                                  ) : (result.current_step > executionPlan.main.step_range[1] || (result.current_step >= executionPlan.main.step_range[1] && result.status === "passed")) ? (
+                                    <CheckCircle2 size={12} className="text-white" />
+                                  ) : (
+                                    <span className="text-[10px] font-semibold text-white">
+                                      {result.current_step >= executionPlan.main.step_range[0] && result.current_step <= executionPlan.main.step_range[1] ? result.current_step : executionPlan.main.step_range[0]}
+                                    </span>
+                                  )}
                                 </div>
-                                {step.arguments.url && (
-                                  <div className="text-xs text-[var(--text-tertiary)] mt-1 truncate">
-                                    {step.arguments.url}
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium text-[var(--text-primary)]">
+                                    {executionPlan.main.name}
                                   </div>
-                                )}
-                                {step.arguments.assertion_description && (
-                                  <div className="text-xs text-blue-600 mt-1">
-                                    ✓ {step.arguments.assertion_description}
+                                  <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                                    Steps {executionPlan.main.step_range[0]}-{executionPlan.main.step_range[1]} • {executionPlan.main.steps} steps
                                   </div>
-                                )}
+                                </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        )}
 
+                        {/* After Test Cases */}
+                        {executionPlan.after && executionPlan.after.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-[var(--text-tertiary)] uppercase mb-2">
+                              Run After
+                            </div>
+                            <div className="space-y-2">
+                              {executionPlan.after.map((afterStep, idx) => {
+                                const [rangeStart, rangeEnd] = afterStep.step_range;
+                                const isInRange = result.current_step >= rangeStart && result.current_step <= rangeEnd;
+                                const isCompleted = result.current_step > rangeEnd || (result.current_step >= rangeEnd && result.status === "passed");
+                                const hasFailed = result.status === "failed" && isInRange;
+                                
+                                return (
+                                  <div
+                                    key={`after-${idx}`}
+                                    className={`p-3 rounded-[6px] border ${
+                                      hasFailed ? "bg-red-50 border-red-200" :
+                                      isCompleted ? "bg-green-50 border-green-200" :
+                                      isInRange ? "bg-blue-50 border-blue-200" :
+                                      "bg-white border-[var(--border-light)]"
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                                        hasFailed ? "bg-red-500" :
+                                        isCompleted ? "bg-green-500" :
+                                        isInRange ? "bg-blue-500" :
+                                        "bg-gray-300"
+                                      }`}>
+                                        {hasFailed ? (
+                                          <XCircle size={12} className="text-white" />
+                                        ) : isCompleted ? (
+                                          <CheckCircle2 size={12} className="text-white" />
+                                        ) : (
+                                          <span className="text-[10px] font-semibold text-white">
+                                            {isInRange ? result.current_step : rangeStart}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-medium text-[var(--text-primary)]">
+                                          {afterStep.name}
+                                        </div>
+                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                                          Steps {rangeStart}-{rangeEnd} • {afterStep.steps} steps
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

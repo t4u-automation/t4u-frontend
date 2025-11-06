@@ -105,6 +105,24 @@
       ]
     },
     {
+      "collectionGroup": "test_cases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "project_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tenant_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "test_case_statuses",
       "queryScope": "COLLECTION",
       "fields": [

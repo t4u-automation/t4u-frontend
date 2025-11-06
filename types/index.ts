@@ -202,6 +202,10 @@ export interface TestCase {
   created_by: string; // User ID
   proven_steps?: ProvenStep[];
   proven_steps_count?: number;
+  shared_test_cases?: {
+    before?: string[];
+    after?: string[];
+  };
 }
 
 export interface TestCaseStep {
@@ -276,15 +280,31 @@ export interface TestPlan {
   created_by: string; // User ID
 }
 
+export interface ExecutionPlanStep {
+  name: string;
+  step_range: [number, number];
+  steps: number;
+  test_case_id: string;
+}
+
+export interface ExecutionPlan {
+  before: ExecutionPlanStep[];
+  main: ExecutionPlanStep;
+  after: ExecutionPlanStep[];
+}
+
 export interface RunTestCaseResult {
   test_case_id: string;
   status: "pending" | "running" | "passed" | "failed";
-  vnc_url?: string;
+  vnc_url?: string | null;
   started_at?: string;
   completed_at?: string;
   current_step: number;
-  total_steps: number;
-  error?: string;
+  total_steps: number; // Includes steps from shared test cases (before + current + after)
+  passed_steps?: number;
+  failed_steps?: number;
+  execution_plan?: ExecutionPlan;
+  error?: string | null;
 }
 
 export interface Run {

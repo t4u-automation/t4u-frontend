@@ -41,6 +41,33 @@ export async function getStoryTestCases(
 }
 
 /**
+ * Get all test cases for a project
+ */
+export async function getProjectTestCases(
+  projectId: string,
+  tenantId: string
+): Promise<TestCase[]> {
+  try {
+    const testCasesRef = collection(db, "test_cases");
+    const q = query(
+      testCasesRef,
+      where("project_id", "==", projectId),
+      where("tenant_id", "==", tenantId),
+      orderBy("created_at", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as TestCase[];
+  } catch (error) {
+    console.error("[T4U] Error fetching test cases for project:", error);
+    throw error;
+  }
+}
+
+/**
  * Create a new test case
  */
 export async function createTestCase(
@@ -316,5 +343,104 @@ export async function getTestCaseById(testCaseId: string): Promise<TestCase | nu
   } catch (error) {
     console.error("[T4U] Error fetching test case:", error);
     throw error;
+  }
+}
+
+/**
+ * Update shared test cases (before/after)
+ */
+export async function updateSharedTestCases(
+  testCaseId: string,
+  before: string[],
+  after: string[]
+): Promise<void> {
+  try {
+    const testCaseRef = doc(db, "test_cases", testCaseId);
+    await setDoc(
+      testCaseRef,
+      {
+        shared_test_cases: {
+          before,
+          after,
+        },
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    console.log("[T4U] Shared test cases updated:", testCaseId);
+  } catch (error) {
+    console.error("[T4U] Error updating shared test cases:", error);
+    throw error;
+  }
+}
+
+/**
+ * Recursively get all proven steps for a test case including shared test cases
+ * Returns steps in order: before steps -> current steps -> after steps
+ */
+export async function getTestCaseProvenStepsRecursive(
+  testCaseId: string,
+  visitedIds: Set<string> = new Set()
+): Promise<{ test_case_id: string; proven_steps: any[]; name: string }[]> {
+  // Prevent infinite loops
+  if (visitedIds.has(testCaseId)) {
+    console.warn(`[T4U] Circular reference detected for test case: ${testCaseId}`);
+    return [];
+  }
+  
+  visitedIds.add(testCaseId);
+  
+  try {
+    const testCase = await getTestCaseById(testCaseId);
+    if (!testCase) {
+      console.warn(`[T4U] Test case not found: ${testCaseId}`);
+      return [];
+    }
+
+    const result: { test_case_id: string; proven_steps: any[]; name: string }[] = [];
+
+    // Get "before" test cases recursively
+    if (testCase.shared_test_cases?.before) {
+      for (const beforeId of testCase.shared_test_cases.before) {
+        const beforeSteps = await getTestCaseProvenStepsRecursive(beforeId, new Set(visitedIds));
+        result.push(...beforeSteps);
+      }
+    }
+
+    // Add current test case proven steps
+    if (testCase.proven_steps && testCase.proven_steps.length > 0) {
+      result.push({
+        test_case_id: testCase.id,
+        proven_steps: testCase.proven_steps,
+        name: testCase.name,
+      });
+    }
+
+    // Get "after" test cases recursively
+    if (testCase.shared_test_cases?.after) {
+      for (const afterId of testCase.shared_test_cases.after) {
+        const afterSteps = await getTestCaseProvenStepsRecursive(afterId, new Set(visitedIds));
+        result.push(...afterSteps);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`[T4U] Error getting recursive proven steps for ${testCaseId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Get total steps count for a test case including shared test cases
+ */
+export async function getTestCaseTotalSteps(testCaseId: string): Promise<number> {
+  try {
+    const allSteps = await getTestCaseProvenStepsRecursive(testCaseId);
+    const totalSteps = allSteps.reduce((sum, item) => sum + item.proven_steps.length, 0);
+    return totalSteps;
+  } catch (error) {
+    console.error(`[T4U] Error calculating total steps for ${testCaseId}:`, error);
+    return 0;
   }
 }

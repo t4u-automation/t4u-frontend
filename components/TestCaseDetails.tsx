@@ -16,6 +16,8 @@ import { useToast } from "@/contexts/ToastContext";
 import { useTestCaseComments } from "@/hooks/useTestCaseComments";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import SharedTestCasesSection from "./SharedTestCasesSection";
+import { getProjectTestCases, updateSharedTestCases } from "@/lib/firestore/testCases";
 
 interface TestCaseDetailsProps {
   testCase: TestCase;
@@ -59,6 +61,7 @@ export default function TestCaseDetails({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [provenSteps, setProvenSteps] = useState<ProvenStep[] | undefined>(testCase.proven_steps);
   const [provenStepsCount, setProvenStepsCount] = useState<number | undefined>(testCase.proven_steps_count);
+  const [projectTestCases, setProjectTestCases] = useState<TestCase[]>([]);
 
   // Comments functionality
   const { comments, loading: commentsLoading, addComment, updateComment, deleteComment } = useTestCaseComments(testCase.id, tenant?.id);
@@ -117,6 +120,22 @@ export default function TestCaseDetails({
 
     return () => unsubscribe();
   }, [testCase.id]);
+
+  // Fetch project test cases for shared test cases functionality
+  useEffect(() => {
+    if (!tenant?.id || !testCase.project_id) return;
+    
+    const fetchProjectTestCases = async () => {
+      try {
+        const testCases = await getProjectTestCases(testCase.project_id, tenant.id);
+        setProjectTestCases(testCases);
+      } catch (error) {
+        console.error("[TestCaseDetails] Error fetching project test cases:", error);
+      }
+    };
+
+    fetchProjectTestCases();
+  }, [testCase.project_id, tenant?.id]);
 
   const handleRunWithAgent = async () => {
     if (!user || !tenant) return;
@@ -295,6 +314,17 @@ export default function TestCaseDetails({
   const handleCancelEditComment = () => {
     setEditingCommentId(null);
     setEditingCommentContent("");
+  };
+
+  const handleSaveSharedTestCases = async (before: string[], after: string[]) => {
+    try {
+      await updateSharedTestCases(testCase.id, before, after);
+      showSuccess("Shared test cases updated");
+    } catch (error) {
+      console.error("[TestCaseDetails] Error saving shared test cases:", error);
+      showError("Failed to save shared test cases");
+      throw error;
+    }
   };
 
   // Format date helper
@@ -706,6 +736,18 @@ export default function TestCaseDetails({
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Run Before / Run After */}
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+                Shared Test Cases
+              </h3>
+              <SharedTestCasesSection
+                testCase={testCase}
+                allTestCases={projectTestCases}
+                onSave={handleSaveSharedTestCases}
+              />
             </div>
 
             {/* Comments */}
