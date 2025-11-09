@@ -146,3 +146,4 @@ export async function removeUserFromTenant(userId: string): Promise<void> {
     throw error;
   }
 }
+
