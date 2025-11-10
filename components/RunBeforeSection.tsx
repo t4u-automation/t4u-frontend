@@ -9,6 +9,7 @@ import { Check, Loader2, Play, CheckCircle2, XCircle } from "lucide-react";
 interface RunBeforeSectionProps {
   sessionId: string;
   tenantId?: string;
+  isVisible?: boolean;
 }
 
 interface RunBeforeExecution {
@@ -19,7 +20,7 @@ interface RunBeforeExecution {
   details?: string;
 }
 
-export default function RunBeforeSection({ sessionId, tenantId }: RunBeforeSectionProps) {
+export default function RunBeforeSection({ sessionId, tenantId, isVisible = true }: RunBeforeSectionProps) {
   const [executions, setExecutions] = useState<RunBeforeExecution[]>([]);
   const [isComplete, setIsComplete] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -178,7 +179,7 @@ export default function RunBeforeSection({ sessionId, tenantId }: RunBeforeSecti
     return () => unsubscribe();
   }, [sessionId, tenantId]);
 
-  if (executions.length === 0) {
+  if (executions.length === 0 || !isVisible) {
     return null;
   }
 

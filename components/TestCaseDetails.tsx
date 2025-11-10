@@ -1007,33 +1007,34 @@ export default function TestCaseDetails({
             {latestSession ? (
               /* Agent Execution View - Show when agent_session exists */
               <div className="flex-1 flex flex-col h-full relative bg-[var(--background-gray-main)]">
-                {/* System Events Header and Sandbox Setup - Outside scrollable area */}
-                <div className="bg-white border-b border-[var(--border-light)]">
-                  <div className="px-6 pt-6 pb-4">
-                    <SystemEventsListener
-                      key={`system-${latestSession.session_id}`}
-                      sessionId={latestSession.session_id}
-                      tenantId={tenant?.id}
-                      isSessionActive={latestSession.status !== "completed" && latestSession.status !== "error"}
-                      onRun={handleRunWithAgent}
-                      onCancel={handleCancelAgent}
-                    />
-                  </div>
-                  
-                  {/* Sandbox Setup Section */}
-                  <SandboxSetupSection
-                    key={`sandbox-${latestSession.session_id}`}
-                    sessionId={latestSession.session_id}
-                    tenantId={tenant?.id}
-                  />
-                  
-                  {/* Run Before Section - Prerequisite Test Cases */}
-                  <RunBeforeSection
-                    key={`runbefore-${latestSession.session_id}`}
-                    sessionId={latestSession.session_id}
-                    tenantId={tenant?.id}
-                  />
-                </div>
+                {/* System Events Header with Collapsable Setup Sections */}
+                <SystemEventsListener
+                  key={`system-${latestSession.session_id}`}
+                  sessionId={latestSession.session_id}
+                  tenantId={tenant?.id}
+                  isSessionActive={latestSession.status !== "completed" && latestSession.status !== "error"}
+                  onRun={handleRunWithAgent}
+                  onCancel={handleCancelAgent}
+                  renderSetupSections={(isExpanded) => (
+                    <>
+                      {/* Sandbox Setup Section */}
+                      <SandboxSetupSection
+                        key={`sandbox-${latestSession.session_id}`}
+                        sessionId={latestSession.session_id}
+                        tenantId={tenant?.id}
+                        isVisible={isExpanded}
+                      />
+                      
+                      {/* Run Before Section - Prerequisite Test Cases */}
+                      <RunBeforeSection
+                        key={`runbefore-${latestSession.session_id}`}
+                        sessionId={latestSession.session_id}
+                        tenantId={tenant?.id}
+                        isVisible={isExpanded}
+                      />
+                    </>
+                  )}
+                />
 
                 {/* Agent Steps Panel - Scrollable with padding */}
                 <div className="flex-1 overflow-y-auto px-6 py-6 bg-[var(--background-gray-main)]">

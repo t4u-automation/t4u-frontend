@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AgentStep } from "@/types";
-import { Check, Loader2, X, RotateCw } from "lucide-react";
+import { Check, Loader2, X, RotateCw, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SystemEventsListenerProps {
   sessionId: string;
@@ -12,6 +12,7 @@ interface SystemEventsListenerProps {
   isSessionActive?: boolean;
   onRun?: () => Promise<void>;
   onCancel?: (sessionId: string) => Promise<void>;
+  renderSetupSections?: (isExpanded: boolean) => React.ReactNode;
 }
 
 interface SystemEvent {
@@ -31,6 +32,7 @@ export default function SystemEventsListener({
   isSessionActive = false,
   onRun,
   onCancel,
+  renderSetupSections,
 }: SystemEventsListenerProps) {
   const [systemEvent, setSystemEvent] = useState<SystemEvent | null>(null);
   const [terminateEvent, setTerminateEvent] = useState<TerminateEvent | null>(null);
@@ -39,6 +41,7 @@ export default function SystemEventsListener({
   const [isRunning, setIsRunning] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isSetupExpanded, setIsSetupExpanded] = useState(true);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -183,40 +186,60 @@ export default function SystemEventsListener({
   // Show skeleton loading
   if (showSkeleton) {
     return (
-      <div id="SystemEventsHeader">
-        <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] bg-[var(--fill-white)] shadow-sm">
-          <div className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-500 flex-shrink-0">
-            <Loader2 size={12} className="text-white animate-spin" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="h-4 bg-gray-200 rounded animate-pulse w-48" />
-          </div>
-          <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
+      <div id="SystemEventsHeader" className="bg-white border-b border-[var(--border-light)]">
+        <div className="px-6 pt-6">
+          <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] bg-[var(--fill-white)] shadow-sm">
+            <div className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-500 flex-shrink-0">
+              <Loader2 size={12} className="text-white animate-spin" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="h-4 bg-gray-200 rounded animate-pulse w-48" />
+            </div>
+            <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
 
-          {/* Cancel Button */}
-          {onCancel && sessionId && (
+            {/* Collapse/Expand Button for Setup Sections */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCancel();
-              }}
-              disabled={isCancelling}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex-shrink-0 text-sm font-medium"
-              title="Cancel execution"
+              onClick={() => setIsSetupExpanded(!isSetupExpanded)}
+              className="flex items-center justify-center w-6 h-6 rounded hover:bg-black/5 transition-colors"
+              title={isSetupExpanded ? "Hide setup details" : "Show setup details"}
             >
-              {isCancelling ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Cancelling...</span>
-                </>
+              {isSetupExpanded ? (
+                <ChevronUp size={16} className="text-[var(--text-secondary)]" />
               ) : (
-                <>
-                  <X size={14} />
-                  <span>Cancel</span>
-                </>
+                <ChevronDown size={16} className="text-[var(--text-secondary)]" />
               )}
             </button>
-          )}
+
+            {/* Cancel Button */}
+            {onCancel && sessionId && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCancel();
+                }}
+                disabled={isCancelling}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex-shrink-0 text-sm font-medium"
+                title="Cancel execution"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <>
+                    <X size={14} />
+                    <span>Cancel</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Render Setup Sections (Sandbox and Run Before) - Also in skeleton state */}
+        <div className="pb-4">
+          {renderSetupSections && renderSetupSections(isSetupExpanded)}
         </div>
       </div>
     );
@@ -236,18 +259,19 @@ export default function SystemEventsListener({
   const isInProgress = !isTerminated && !allStepsCompleted;
 
   return (
-    <div id="SystemEventsHeader">
-      <div
-        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm transition-all ${
-          isTerminated
-            ? terminateEvent.status === "success"
-              ? "bg-green-50 border-green-200"
-              : isCancelled
-              ? "bg-yellow-50 border-yellow-200"
-              : "bg-red-50 border-red-200"
-            : "bg-[var(--fill-white)] border-[var(--border-light)]"
-        }`}
-      >
+    <div id="SystemEventsHeader" className="bg-white border-b border-[var(--border-light)]">
+      <div className="px-6 pt-6">
+        <div
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm transition-all ${
+            isTerminated
+              ? terminateEvent.status === "success"
+                ? "bg-green-50 border-green-200"
+                : isCancelled
+                ? "bg-yellow-50 border-yellow-200"
+                : "bg-red-50 border-red-200"
+              : "bg-[var(--fill-white)] border-[var(--border-light)]"
+          }`}
+        >
         <div
           className={`w-5 h-5 flex items-center justify-center rounded-full flex-shrink-0 ${
             finalIsCompleted
@@ -315,6 +339,19 @@ export default function SystemEventsListener({
           </span>
         )}
 
+        {/* Collapse/Expand Button for Setup Sections */}
+        <button
+          onClick={() => setIsSetupExpanded(!isSetupExpanded)}
+          className="flex items-center justify-center w-6 h-6 rounded hover:bg-black/5 transition-colors"
+          title={isSetupExpanded ? "Hide setup details" : "Show setup details"}
+        >
+          {isSetupExpanded ? (
+            <ChevronUp size={16} className="text-[var(--text-secondary)]" />
+          ) : (
+            <ChevronDown size={16} className="text-[var(--text-secondary)]" />
+          )}
+        </button>
+
         {/* Cancel Button - Show when session is active */}
         {!isTerminated && isSessionActive && onCancel && sessionId && (
           <button
@@ -364,6 +401,12 @@ export default function SystemEventsListener({
             )}
           </button>
         )}
+        </div>
+      </div>
+
+      {/* Render Setup Sections (Sandbox and Run Before) */}
+      <div className="pb-4">
+        {renderSetupSections && renderSetupSections(isSetupExpanded)}
       </div>
     </div>
   );

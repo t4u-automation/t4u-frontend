@@ -9,6 +9,7 @@ import { Check, Loader2, Server, Box, Network, Terminal } from "lucide-react";
 interface SandboxSetupSectionProps {
   sessionId: string;
   tenantId?: string;
+  isVisible?: boolean;
 }
 
 interface SandboxEvent {
@@ -20,7 +21,7 @@ interface SandboxEvent {
   details?: string;
 }
 
-export default function SandboxSetupSection({ sessionId, tenantId }: SandboxSetupSectionProps) {
+export default function SandboxSetupSection({ sessionId, tenantId, isVisible = true }: SandboxSetupSectionProps) {
   const [sandboxEvents, setSandboxEvents] = useState<SandboxEvent[]>([]);
   const [isComplete, setIsComplete] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -171,7 +172,7 @@ export default function SandboxSetupSection({ sessionId, tenantId }: SandboxSetu
     return () => unsubscribe();
   }, [sessionId, vncWasAvailable]);
 
-  if (sandboxEvents.length === 0) {
+  if (sandboxEvents.length === 0 || !isVisible) {
     return null;
   }
 
