@@ -7,9 +7,13 @@ import StatusDropdown from "./StatusDropdown";
 import ConfirmDialog from "./ConfirmDialog";
 import { useTestCaseSession } from "@/hooks/useTestCaseSession";
 import { startAgent, pauseAgent, resumeAgent, cancelAgent } from "@/lib/api";
-import MessageItem from "./MessageItem";
 import FloatingVNC from "./FloatingVNC";
 import SystemEventsHeader from "./SystemEventsHeader";
+import SystemEventsListener from "./SystemEventsListener";
+import SandboxSetupSection from "./SandboxSetupSection";
+import RunBeforeSection from "./RunBeforeSection";
+import PlanningSection from "./PlanningSection";
+import InterventionListener from "./InterventionListener";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/contexts/ToastContext";
@@ -77,7 +81,6 @@ export default function TestCaseDetails({
   // Fetch latest agent session for this test case
   const {
     latestSession,
-    currentSession,
     vncUrl,
     isVNCActive,
     artifacts,
@@ -1004,28 +1007,53 @@ export default function TestCaseDetails({
             {latestSession ? (
               /* Agent Execution View - Show when agent_session exists */
               <div className="flex-1 flex flex-col h-full relative bg-[var(--background-gray-main)]">
-                {/* Task Header - Outside scrollable area */}
-                <div className="px-6 pt-6 pb-6 bg-white">
-                  <SystemEventsHeader
-                    message={currentSession?.messages.find((m) => m.role === "assistant") || null}
+                {/* System Events Header and Sandbox Setup - Outside scrollable area */}
+                <div className="bg-white border-b border-[var(--border-light)]">
+                  <div className="px-6 pt-6 pb-4">
+                    <SystemEventsListener
+                      key={`system-${latestSession.session_id}`}
+                      sessionId={latestSession.session_id}
+                      tenantId={tenant?.id}
+                      isSessionActive={latestSession.status !== "completed" && latestSession.status !== "error"}
+                      onRun={handleRunWithAgent}
+                      onCancel={handleCancelAgent}
+                    />
+                  </div>
+                  
+                  {/* Sandbox Setup Section */}
+                  <SandboxSetupSection
+                    key={`sandbox-${latestSession.session_id}`}
                     sessionId={latestSession.session_id}
-                    isSessionActive={latestSession.status !== "completed" && latestSession.status !== "error"}
-                    onScrollToMessage={() => {}}
-                    onRun={handleRunWithAgent}
-                    onCancel={handleCancelAgent}
+                    tenantId={tenant?.id}
+                  />
+                  
+                  {/* Run Before Section - Prerequisite Test Cases */}
+                  <RunBeforeSection
+                    key={`runbefore-${latestSession.session_id}`}
+                    sessionId={latestSession.session_id}
+                    tenantId={tenant?.id}
                   />
                 </div>
 
                 {/* Agent Steps Panel - Scrollable with padding */}
-                <div className="flex-1 overflow-y-auto px-6 pb-6 bg-[var(--background-gray-main)]">
-                  {/* Messages */}
-                  {currentSession && (
-                    <div className="flex flex-col gap-3 pt-6">
-                      {currentSession.messages.map((message) => (
-                        <MessageItem key={message.id} message={message} />
-                      ))}
-                    </div>
-                  )}
+                <div className="flex-1 overflow-y-auto px-6 py-6 bg-[var(--background-gray-main)]">
+                  <div className="flex flex-col gap-6">
+                    {/* Planning Section with collapsable details */}
+                    <PlanningSection
+                      key={`planning-${latestSession.session_id}`}
+                      sessionId={latestSession.session_id}
+                      tenantId={tenant?.id}
+                    />
+
+                    {/* Intervention Listener - Shows intervention messages and input */}
+                    <InterventionListener
+                      key={`intervention-${latestSession.session_id}`}
+                      sessionId={latestSession.session_id}
+                      tenantId={tenant?.id}
+                      isSessionActive={latestSession.status !== "completed" && latestSession.status !== "error"}
+                      onInterventionSent={() => showSuccess("Response sent to agent")}
+                    />
+                  </div>
                 </div>
 
                 {/* Floating VNC Viewer */}
