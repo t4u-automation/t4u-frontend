@@ -26,6 +26,7 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
   const [isComplete, setIsComplete] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [vncWasAvailable, setVncWasAvailable] = useState(false);
+  const [sessionCompleted, setSessionCompleted] = useState(false);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -37,6 +38,7 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
     setIsComplete(false);
     setIsInitialLoad(true);
     setVncWasAvailable(false);
+    setSessionCompleted(false);
 
     const stepsRef = collection(db, "agent_steps");
     const q = tenantId
@@ -145,7 +147,7 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
     return () => unsubscribe();
   }, [sessionId, tenantId]);
 
-  // Listen to agent_session to track VNC URL availability
+  // Listen to agent_session to track VNC URL availability and session completion
   useEffect(() => {
     if (!sessionId) return;
 
@@ -162,6 +164,12 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
             console.log("[SandboxSetupSection] VNC URL available:", sessionData.vnc_url);
             setVncWasAvailable(true);
           }
+          
+          // Track if session is completed or errored
+          if (sessionData.status === "completed" || sessionData.status === "error") {
+            console.log("[SandboxSetupSection] Session completed/errored:", sessionData.status);
+            setSessionCompleted(true);
+          }
         }
       },
       (error) => {
@@ -176,17 +184,18 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
     return null;
   }
 
-  // Show compact view once sandbox is complete AND VNC was available at least once
-  // This handles the case where VNC URL gets set to null on cancellation/completion
-  if (isComplete && vncWasAvailable) {
+  // Show compact view if:
+  // 1. Sandbox is complete AND VNC was available at least once (normal case)
+  // 2. OR session completed/errored (handles case where VNC never became available)
+  if ((isComplete && vncWasAvailable) || sessionCompleted) {
     return (
-      <div className="px-6 pb-4 bg-white">
-        <div className="border-t border-[var(--border-light)] pt-4">
-          <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 shadow-sm">
+      <div className="px-6 pt-3 pb-3 bg-white">
+        <div className="pl-4">
+          <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] bg-[var(--fill-tsp-gray-main)] shadow-sm">
             <div className="w-5 h-5 flex items-center justify-center rounded-full bg-green-500 flex-shrink-0">
               <Check size={12} className="text-white" />
             </div>
-            <span className="text-sm font-medium text-green-700">
+            <span className="text-sm font-medium text-[var(--text-primary)]">
               Sandbox Ready - Environment ready for test execution
             </span>
           </div>
@@ -195,35 +204,10 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
     );
   }
 
-  const getEventIcon = (type: SandboxEvent["type"]) => {
-    switch (type) {
-      case "sandbox_initializing":
-        return <Server size={16} />;
-      case "sandbox_ready":
-        return <Check size={16} />;
-      case "sandbox_configured":
-        return <Terminal size={16} />;
-      default:
-        return <Box size={16} />;
-    }
-  };
-
-  const getEventTitle = (type: SandboxEvent["type"]) => {
-    switch (type) {
-      case "sandbox_initializing":
-        return "Provisioning Sandbox";
-      case "sandbox_ready":
-        return "Sandbox Ready";
-      case "sandbox_configured":
-        return "Sandbox Configured";
-      default:
-        return "Setup Step";
-    }
-  };
 
   return (
-    <div className="px-6 pb-4 bg-white">
-      <div className="border-t border-[var(--border-light)] pt-4">
+    <div className="px-6 pt-3 pb-3 bg-white">
+      <div className="pl-4">
         <div className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--fill-white)] shadow-sm p-3">
           <h4 className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wide mb-3">
             Sandbox Setup
@@ -277,7 +261,11 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
                           : "text-blue-600"
                       }`}
                     >
-                      {getEventTitle(event.type)}
+                      {event.type === "sandbox_initializing" 
+                        ? "Provisioning Sandbox" 
+                        : event.type === "sandbox_ready"
+                        ? "Sandbox Ready"
+                        : "Setup Step"}
                     </span>
                     {event.status === "running" && (
                       <span className="text-xs text-[var(--text-tertiary)] animate-pulse">
@@ -293,10 +281,6 @@ export default function SandboxSetupSection({ sessionId, tenantId, isVisible = t
                   )}
                 </div>
 
-                {/* Icon */}
-                <div className="text-[var(--text-tertiary)] mt-0.5">
-                  {getEventIcon(event.type)}
-                </div>
               </div>
             );
           })}
